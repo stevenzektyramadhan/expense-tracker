@@ -1,36 +1,158 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 📖 Personal Expense Tracker
 
-## Getting Started
+Aplikasi web untuk **mencatat pengeluaran pribadi** menggunakan **Next.js, Supabase, dan Cloudinary**.
 
-First, run the development server:
+MVP ini ditujukan untuk penggunaan pribadi & lingkar terdekat, dengan fitur:
+
+- ✅ Login/registrasi
+- ✅ Tambah & lihat pengeluaran
+- ✅ Ringkasan bulanan
+- ✅ (Opsional) Upload bukti struk ke Cloudinary
+
+---
+
+## 🚀 Tech Stack
+
+- **Next.js (App Router)** → Frontend & API routes
+- **TailwindCSS** → Styling UI
+- **Supabase** → Authentication + Postgres Database + Row Level Security (RLS)
+- **Cloudinary** → Media storage untuk foto struk
+- **Vercel** → (opsional) Deployment
+
+---
+
+## 📂 Folder Structure
+
+```
+expense-tracker/
+├─ app/                       # Next.js App Router
+│  ├─ (auth)/                 # Auth pages (doesn't affect URL)
+│  │  ├─ login/page.js
+│  │  ├─ register/page.js
+│  │
+│  ├─ (dashboard)/            # Dashboard pages
+│  │  ├─ layout.js            # Layout with navbar/sidebar
+│  │  ├─ page.js              # List pengeluaran
+│  │  ├─ add/page.js          # Form tambah pengeluaran
+│  │  ├─ summary/page.js      # Ringkasan bulanan
+│  │
+│  ├─ api/                    # API Routes
+│  │  ├─ upload/route.js      # Upload struk ke Cloudinary
+│  │
+│  ├─ layout.js               # Root layout
+│  └─ page.js                 # Landing page / redirect
+│
+├─ components/                # Reusable components
+│  ├─ ui/                     # Basic UI (Button, Card, Input)
+│  ├─ forms/                  # Form-specific components
+│
+├─ hooks/                     # Custom hooks (useAuth, useExpenses)
+├─ lib/                       # Helpers
+│  ├─ supabaseClient.js       # Supabase init
+│  ├─ cloudinary.js           # Cloudinary init
+│
+├─ styles/                    # Tailwind styles
+│  ├─ globals.css
+├─ public/                    # Static assets
+├─ .env.local                 # Env variables
+├─ tailwind.config.js
+├─ jsconfig.json              # Path alias (@)
+└─ README.md
+```
+
+---
+
+## 🔧 Setup & Installation
+
+1. **Clone repo & install dependencies**
+
+```bash
+git clone <repo-url>
+cd expense-tracker
+npm install
+```
+
+2. **Setup Supabase**
+
+   - Buat project di [Supabase](https://supabase.com)
+   - Aktifkan Email Auth
+   - Buat tabel `expenses`
+
+   ```sql
+   CREATE TABLE expenses (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+     amount DECIMAL(10,2) NOT NULL,
+     category VARCHAR(50) NOT NULL,
+     date DATE NOT NULL,
+     description TEXT,
+     receipt_url TEXT,
+     created_at TIMESTAMP DEFAULT NOW()
+   );
+
+   ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+
+   CREATE POLICY "Users can view own expenses"
+   ON expenses FOR SELECT USING (auth.uid() = user_id);
+
+   CREATE POLICY "Users can insert own expenses"
+   ON expenses FOR INSERT WITH CHECK (auth.uid() = user_id);
+   ```
+
+3. **Setup Cloudinary** (opsional, untuk upload struk)
+
+   - Buat akun [Cloudinary](https://cloudinary.com)
+   - Ambil `CLOUD_NAME`, `API_KEY`, `API_SECRET`
+
+4. \*\*Buat file \*\*\`\`
+
+```
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+
+CLOUDINARY_CLOUD_NAME=<your-cloudinary-name>
+CLOUDINARY_API_KEY=<your-cloudinary-api-key>
+CLOUDINARY_API_SECRET=<your-cloudinary-api-secret>
+```
+
+5. **Jalankan dev server**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+6. **Build & Production**
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🗄 Database Schema
 
-To learn more about Next.js, take a look at the following resources:
+Tabel utama: **expenses**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Field       | Type          | Description                  |
+| ----------- | ------------- | ---------------------------- |
+| id          | UUID (PK)     | Auto-generated ID            |
+| user_id     | UUID          | Reference ke `auth.users.id` |
+| amount      | DECIMAL(10,2) | Jumlah pengeluaran           |
+| category    | VARCHAR(50)   | Makanan, Transportasi, dll   |
+| date        | DATE          | Tanggal pengeluaran          |
+| description | TEXT          | Deskripsi optional           |
+| receipt_url | TEXT          | URL bukti struk (Cloudinary) |
+| created_at  | TIMESTAMP     | Waktu insert                 |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## ✨ Fitur
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ✅ **Autentikasi Supabase** (email/password)
+- ✅ **Tambah pengeluaran** (amount, kategori, tanggal, deskripsi, upload struk opsional)
+- ✅ **List pengeluaran** user (hanya bisa lihat data sendiri)
+- ✅ **Ringkasan bulanan** (total + per kategori)
+- ✅ **Row Level Security** di Supabase → aman untuk multi-user
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
