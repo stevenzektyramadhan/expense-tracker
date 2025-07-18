@@ -138,21 +138,21 @@ export default function AddExpensePage() {
         <p className="text-gray-600">Catat pengeluaran baru Anda</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 text-black">
         {/* Amount */}
         <div>
           <label htmlFor="amount" className="block text-sm font-medium text-black mb-2">
             Jumlah Pengeluaran *
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black">Rp</span>
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 ">Rp</span>
             <input
               type="number"
               id="amount"
               name="amount"
               value={formData.amount}
               onChange={handleInputChange}
-              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0"
               min="0"
               step="0.01"
