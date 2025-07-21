@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
+import CategorySelect from "../components/CategorySelect";
 
 export default function AddExpensePage() {
   const { user, loading } = useAuth();
@@ -11,16 +12,17 @@ export default function AddExpensePage() {
 
   const [formData, setFormData] = useState({
     amount: "",
-    category: "Makanan",
     date: new Date().toISOString().split("T")[0],
     description: "",
   });
 
+  // ✅ Tambah state khusus kategori
+  const [selectedCategory, setSelectedCategory] = useState("Makanan");
+  const [customCategory, setCustomCategory] = useState("");
+
   const [receipt, setReceipt] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const categories = ["Makanan", "Transportasi", "Lainnya"];
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -50,9 +52,7 @@ export default function AddExpensePage() {
         body: formDataUpload,
       });
 
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
+      if (!response.ok) throw new Error("Upload failed");
 
       const data = await response.json();
       return data.url;
@@ -73,7 +73,7 @@ export default function AddExpensePage() {
       return;
     }
 
-    if (!formData.amount || !formData.category || !formData.date) {
+    if (!formData.amount || !selectedCategory || !formData.date) {
       alert("Mohon lengkapi semua field yang wajib");
       return;
     }
@@ -81,32 +81,32 @@ export default function AddExpensePage() {
     setSubmitting(true);
 
     try {
-      // Upload receipt if exists
+      // ✅ Tentukan kategori yang akan disimpan
+      const categoryToSave = selectedCategory === "Lainnya" && customCategory.trim() !== "" ? customCategory.trim() : selectedCategory;
+
+      // Upload receipt jika ada
       let receiptUrl = null;
       if (receipt) {
         receiptUrl = await uploadReceipt();
         if (receipt && !receiptUrl) {
-          // Upload failed, stop submission
           setSubmitting(false);
           return;
         }
       }
 
-      // Save to Supabase
+      // Save ke Supabase
       const { error } = await supabase.from("expenses").insert([
         {
           user_id: user.id,
           amount: parseFloat(formData.amount),
-          category: formData.category,
+          category: categoryToSave,
           date: formData.date,
           description: formData.description,
           receipt_url: receiptUrl,
         },
       ]);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       alert("Pengeluaran berhasil ditambahkan!");
       router.push("/");
@@ -161,19 +161,8 @@ export default function AddExpensePage() {
           </div>
         </div>
 
-        {/* Category */}
-        <div>
-          <label htmlFor="category" className="block text-sm font-medium text-black mb-2">
-            Kategori *
-          </label>
-          <select id="category" name="category" value={formData.category} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* ✅ Category pakai reusable */}
+        <CategorySelect value={selectedCategory} onChange={setSelectedCategory} customValue={customCategory} onCustomChange={setCustomCategory} />
 
         {/* Date */}
         <div>
