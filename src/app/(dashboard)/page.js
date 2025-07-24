@@ -10,6 +10,7 @@ import ExpenseListItem from "./components/ExpenseListItem";
 import ExpenseDetailModal from "./components/ExpenseDetailModal";
 import EditExpenseModal from "./components/EditExpenseModal";
 import ImageZoomModal from "./components/ImageZoomModal";
+import DashboardFilters from "./components/DashboardFilters";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -19,6 +20,12 @@ export default function DashboardPage() {
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
   const [zoomImage, setZoomImage] = useState(null);
+  const [filters, setFilters] = useState({
+    month: "",
+    category: "",
+    search: "",
+    sort: "date-desc",
+  });
 
   useEffect(() => {
     if (user) loadExpenses();
@@ -45,10 +52,45 @@ export default function DashboardPage() {
     setExpenses(expenses.map((e) => (e.id === id ? { ...e, ...updatedData } : e)));
   };
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-
   if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
 
+  const getFilteredExpenses = () => {
+    let filtered = [...expenses];
+
+    // Filter bulan
+    if (filters.month) {
+      filtered = filtered.filter((e) => {
+        const d = new Date(e.date);
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        return m === filters.month;
+      });
+    }
+
+    // Filter kategori
+    if (filters.category) {
+      filtered = filtered.filter((e) => e.category === filters.category);
+    }
+
+    // Search
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      filtered = filtered.filter((e) => e.description?.toLowerCase().includes(q) || e.category.toLowerCase().includes(q));
+    }
+
+    // Sort
+    if (filters.sort === "date-desc") {
+      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    } else if (filters.sort === "date-asc") {
+      filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    } else if (filters.sort === "amount-desc") {
+      filtered.sort((a, b) => b.amount - a.amount);
+    } else if (filters.sort === "amount-asc") {
+      filtered.sort((a, b) => a.amount - b.amount);
+    }
+
+    return filtered;
+  };
+  const totalExpenses = getFilteredExpenses().reduce((sum, e) => sum + e.amount, 0);
   return (
     <>
       <div className="space-y-6">
@@ -61,7 +103,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Summary Cards */}
-        <SummaryCards totalExpenses={totalExpenses} totalTransactions={expenses.length} />
+        <SummaryCards totalExpenses={totalExpenses} totalTransactions={getFilteredExpenses().length} />
 
         {/* Error */}
         {error && (
@@ -70,6 +112,8 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Filter Bar */}
+        <DashboardFilters categories={["Makanan", "Transportasi", "Lainnya"]} onFilterChange={setFilters} />
         {/* List */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
@@ -81,7 +125,7 @@ export default function DashboardPage() {
               <div className="text-center py-12 text-gray-500">Belum ada pengeluaran</div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {expenses.map((expense) => (
+                {getFilteredExpenses().map((expense) => (
                   <ExpenseListItem key={expense.id} expense={expense} onClick={setSelectedExpense} />
                 ))}
               </ul>
