@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { getExpenses, supabase } from "@/lib/supabaseClient";
+import Swal from "sweetalert2";
 
 // Components
 import SummaryCards from "./components/SummaryCards";
@@ -40,12 +41,28 @@ export default function DashboardPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Yakin mau hapus pengeluaran ini?")) return;
+    const result = await Swal.fire({
+      title: "Yakin mau hapus?",
+      text: "Data pengeluaran ini tidak bisa dikembalikan.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Ya, hapus!",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) return;
+
     const { error } = await supabase.from("expenses").delete().eq("id", id);
     if (!error) {
       setExpenses(expenses.filter((e) => e.id !== id));
       setSelectedExpense(null);
-    } else alert("Gagal menghapus: " + error.message);
+
+      Swal.fire("Terhapus!", "Pengeluaran berhasil dihapus.", "success");
+    } else {
+      Swal.fire("Gagal!", "Gagal menghapus pengeluaran.", "error");
+    }
   };
 
   const handleUpdate = (id, updatedData) => {
