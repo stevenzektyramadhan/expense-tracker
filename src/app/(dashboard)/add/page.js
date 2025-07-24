@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import CategorySelect from "../components/CategorySelect";
+import Swal from "sweetalert2";
 
 export default function AddExpensePage() {
   const { user, loading } = useAuth();
@@ -12,6 +13,7 @@ export default function AddExpensePage() {
 
   const [formData, setFormData] = useState({
     amount: "",
+    category: "Makanan",
     date: new Date().toISOString().split("T")[0],
     description: "",
   });
@@ -68,51 +70,50 @@ export default function AddExpensePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!user) {
-      alert("Anda harus login terlebih dahulu");
+    if (formData.amount === "" || formData.category === "" || formData.date === "") {
+      await Swal.fire("Form Belum Lengkap", "Mohon lengkapi semua field wajib.", "warning");
       return;
     }
 
-    if (!formData.amount || !selectedCategory || !formData.date) {
-      alert("Mohon lengkapi semua field yang wajib");
-      return;
-    }
+    // ✅ selalu definisikan default dulu
+    let receiptUrl = null;
 
-    setSubmitting(true);
+    // ✅ upload hanya kalau ada file struk
+    if (receipt) {
+      receiptUrl = await uploadReceipt();
+      if (!receiptUrl) {
+        await Swal.fire("Gagal Upload", "Struk gagal diupload. Coba lagi.", "error");
+        setSubmitting(false);
+        return;
+      }
+    }
 
     try {
-      // ✅ Tentukan kategori yang akan disimpan
-      const categoryToSave = selectedCategory === "Lainnya" && customCategory.trim() !== "" ? customCategory.trim() : selectedCategory;
-
-      // Upload receipt jika ada
-      let receiptUrl = null;
-      if (receipt) {
-        receiptUrl = await uploadReceipt();
-        if (receipt && !receiptUrl) {
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // Save ke Supabase
       const { error } = await supabase.from("expenses").insert([
         {
           user_id: user.id,
           amount: parseFloat(formData.amount),
-          category: categoryToSave,
+          category: formData.category,
           date: formData.date,
           description: formData.description,
-          receipt_url: receiptUrl,
+          receipt_url: receiptUrl, // ✅ aman meskipun null
         },
       ]);
 
       if (error) throw error;
 
-      alert("Pengeluaran berhasil ditambahkan!");
+      await Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Pengeluaran berhasil ditambahkan!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
       router.push("/");
-    } catch (error) {
-      console.error("Error saving expense:", error.message, error);
-      alert("Gagal menyimpan pengeluaran. Silakan coba lagi.");
+    } catch (err) {
+      console.error("Error saving expense:", err.message);
+      await Swal.fire("Error", "Gagal menyimpan pengeluaran. Silakan coba lagi.", "error");
     } finally {
       setSubmitting(false);
     }
