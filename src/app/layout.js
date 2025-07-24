@@ -15,6 +15,8 @@ export const metadata = {
   title: "Expense Tracker",
   description: "Catat pengeluaran pribadimu dengan mudah",
   manifest: "/manifest.json",
+};
+export const viewport = {
   themeColor: "#4f46e5",
 };
 
