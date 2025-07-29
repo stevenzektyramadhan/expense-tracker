@@ -75,6 +75,12 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <p className="text-sm text-gray-600 mt-2">
+            <a href="/forgot-password" className="text-blue-600 hover:underline">
+              Lupa Password?
+            </a>
+          </p>
+
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{error}</div>
