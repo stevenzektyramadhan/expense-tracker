@@ -20,10 +20,10 @@ export default function EditExpenseModal({ expense, onClose, onUpdate }) {
     const categoryToSave = selectedCategory === "Lainnya" && customCategory.trim() !== "" ? customCategory.trim() : selectedCategory;
 
     const updatedData = {
-      amount: parseFloat(formData.get("amount")),
-      category: categoryToSave,
-      date: formData.get("date"),
-      description: formData.get("description"),
+      amount: parseFloat(e.target.amount.value),
+      category: categoryToSave, // ✅ pakai ini, bukan dari FormData
+      date: e.target.date.value,
+      description: e.target.description.value,
     };
 
     const { error } = await supabase.from("expenses").update(updatedData).eq("id", expense.id);
