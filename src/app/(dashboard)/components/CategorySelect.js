@@ -14,7 +14,7 @@ export default function CategorySelect({ value, onChange, customValue, onCustomC
       <label className="block text-sm font-medium mb-1">Kategori</label>
 
       {/* Dropdown */}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-full border rounded px-2 py-1 bg-white">
+      <select name="category" value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-full border rounded px-2 py-1 bg-white">
         <option value="Makanan">Makanan</option>
         <option value="Transportasi">Transportasi</option>
         <option value="Lainnya">Lainnya</option>

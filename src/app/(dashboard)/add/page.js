@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, deductAllowance } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import CategorySelect from "../components/CategorySelect";
 import Swal from "sweetalert2";
@@ -93,7 +93,7 @@ export default function AddExpensePage() {
         {
           user_id: user.id,
           amount: parseFloat(formData.amount),
-          category: formData.category,
+          category: selectedCategory === "Lainnya" ? customCategory || "Lainnya" : selectedCategory, // ✅ pakai custom kalau pilih lainnya
           date: formData.date,
           description: formData.description,
           receipt_url: receiptUrl, // ✅ aman meskipun null
@@ -102,13 +102,20 @@ export default function AddExpensePage() {
 
       if (error) throw error;
 
-      await Swal.fire({
-        icon: "success",
-        title: "Berhasil!",
-        text: "Pengeluaran berhasil ditambahkan!",
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      // ✅ setelah insert -> update allowance
+      const { error: allowanceError } = await deductAllowance(user.id, parseFloat(formData.amount));
+
+      if (allowanceError) {
+        await Swal.fire("Warning", "Pengeluaran tersimpan, tapi gagal update uang saku.", "warning");
+      } else {
+        await Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Pengeluaran berhasil ditambahkan & uang saku diperbarui!",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
 
       router.push("/");
     } catch (err) {

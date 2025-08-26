@@ -12,12 +12,14 @@ import ExpenseDetailModal from "./components/ExpenseDetailModal";
 import EditExpenseModal from "./components/EditExpenseModal";
 import ImageZoomModal from "./components/ImageZoomModal";
 import DashboardFilters from "./components/DashboardFilters";
+import AllowanceModal from "./components/AllowanceModal";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [allowance, setAllowance] = useState(null);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
   const [zoomImage, setZoomImage] = useState(null);
@@ -27,11 +29,29 @@ export default function DashboardPage() {
     search: "",
     sort: "date-desc",
   });
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (user) loadExpenses();
+    if (user) {
+      loadAllowance();
+      loadExpenses();
+    }
   }, [user]);
 
+  // 🔹 Cek allowance bulan ini, kalau belum ada → buat
+  const loadAllowance = async () => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    const { data, error } = await supabase.from("allowances").select("*").eq("user_id", user.id).eq("month", month).eq("year", year).single();
+
+    if (data) {
+      setAllowance(data);
+    } else {
+      setAllowance(null); // tetap render, tapi kosong
+    }
+  };
   const loadExpenses = async () => {
     setLoading(true);
     const { data, error } = await getExpenses(user.id);
@@ -119,8 +139,23 @@ export default function DashboardPage() {
           </Link>
         </div>
 
+        {/* 🔹 Tambahin Allowance Info */}
+        {allowance && (
+          // <div className="bg-green-100 p-4 rounded-md">
+          //   <p className="text-green-800 font-medium">Uang Saku Bulan Ini: Rp {allowance.amount.toLocaleString()}</p>
+          //   <p className="text-green-600">Sisa: Rp {allowance.remaining.toLocaleString()}</p>
+          // </div>
+          <div className="bg-white p-6 shadow rounded-lg">
+            <h2 className="text-lg font-semibold text-gray-700">Sisa Uang Saku Bulan Ini</h2>
+            <p className="mt-2 text-2xl font-bold text-gray-900">Rp {allowance.remaining.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">Dari Rp {allowance.amount.toLocaleString()}</p>
+            <button className="mt-3 text-sm bg-indigo-600 text-white px-3 py-1 rounded-md hover:bg-indigo-700" onClick={() => setOpen(true)}>
+              Atur
+            </button>
+          </div>
+        )}
         {/* Summary Cards */}
-        <SummaryCards totalExpenses={totalExpenses} totalTransactions={getFilteredExpenses().length} />
+        <SummaryCards totalExpenses={totalExpenses} totalTransactions={getFilteredExpenses().length} allowanceTotal={allowance?.total || 0} allowanceRemaining={allowance?.remaining || 0} />
 
         {/* Error */}
         {error && (
@@ -157,6 +192,16 @@ export default function DashboardPage() {
       {editingExpense && <EditExpenseModal expense={editingExpense} onClose={() => setEditingExpense(null)} onUpdate={handleUpdate} />}
 
       {zoomImage && <ImageZoomModal imageUrl={zoomImage} onClose={() => setZoomImage(null)} />}
+
+      <AllowanceModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        onSaved={() => {
+          setOpen(false);
+          loadAllowance?.(); // refresh data di parent
+        }}
+        userId={user?.id}
+      />
     </>
   );
 }

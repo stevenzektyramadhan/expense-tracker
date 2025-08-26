@@ -55,3 +55,25 @@ export const getExpensesSummary = async (userId, month, year) => {
 
   return { data, error };
 };
+
+// --- Allowance Helper ---
+export async function deductAllowance(userId, amount) {
+  // ambil allowance aktif bulan ini
+  const { data: allowance, error } = await supabase
+    .from("allowances")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("month", new Date().getMonth() + 1)
+    .eq("year", new Date().getFullYear())
+    .single();
+
+  if (error || !allowance) {
+    return { error: error || { message: "Allowance tidak ditemukan" } };
+  }
+
+  const newRemaining = allowance.remaining - amount;
+
+  const { data, error: updateError } = await supabase.from("allowances").update({ remaining: newRemaining }).eq("id", allowance.id).select().single();
+
+  return { data, error: updateError };
+}
