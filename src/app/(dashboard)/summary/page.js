@@ -197,7 +197,7 @@ export default function SummaryPage() {
                       </div>
                       <div className="text-right">
                         <div className="font-semibold text-gray-900">{formatCurrency(category.amount)}</div>
-                        <div className="text-sm text-gray-500">{category.percentage}%</div>
+                        <div className="text-sm text-black">{category.percentage}%</div>
                       </div>
                     </div>
                   ))}

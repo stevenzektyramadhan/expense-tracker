@@ -40,18 +40,62 @@ export default function DashboardPage() {
 
   // 🔹 Cek allowance bulan ini, kalau belum ada → buat
   const loadAllowance = async () => {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
+    try {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
 
-    const { data, error } = await supabase.from("allowances").select("*").eq("user_id", user.id).eq("month", month).eq("year", year).single();
+      console.log("Checking allowance for:", { month, year, userId: user.id });
 
-    if (data) {
-      setAllowance(data);
-    } else {
-      setAllowance(null); // tetap render, tapi kosong
+      const { data, error } = await supabase.from("allowances").select("*").eq("user_id", user.id).eq("month", month).eq("year", year).maybeSingle();
+
+      if (error) {
+        console.error("Error fetching allowance:", error);
+        return;
+      }
+
+      // kalau belum ada allowance → buat baru
+      if (!data) {
+        console.log("No allowance found, creating new one...");
+
+        const { data: newAllowance, error: insertError } = await supabase
+          .from("allowances")
+          .insert([
+            {
+              user_id: user.id,
+              month,
+              year,
+              amount: 0,
+              remaining: 0,
+            },
+          ])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error inserting allowance:", insertError);
+          return;
+        }
+
+        console.log("New allowance created:", newAllowance);
+        setAllowance(newAllowance);
+
+        // ✅ BETUL - buka modal dengan state
+        setOpen(true);
+      } else {
+        console.log("Existing allowance found:", data);
+        setAllowance(data);
+
+        // ✅ BETUL - cek apakah perlu tampilkan modal
+        if (data.amount === 0) {
+          setOpen(true);
+        }
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
     }
   };
+
   const loadExpenses = async () => {
     setLoading(true);
     const { data, error } = await getExpenses(user.id);
