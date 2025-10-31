@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,13 +22,28 @@ export default function SummaryPage() {
   // Colors for pie chart
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
-  useEffect(() => {
-    if (user) {
-      fetchSummaryData();
-    }
-  }, [user]);
+  const updateCurrentMonthData = useCallback((monthData) => {
+    const categories = Object.entries(monthData.categories).map(([name, amount]) => ({
+      name,
+      amount,
+      percentage: ((amount / monthData.total) * 100).toFixed(1),
+    }));
 
-  const fetchSummaryData = async () => {
+    const chartData = categories.map((cat) => ({
+      name: cat.name,
+      value: cat.amount,
+    }));
+
+    setCurrentMonthData({
+      total: monthData.total,
+      categories,
+      chartData,
+    });
+  }, []);
+
+  const fetchSummaryData = useCallback(async () => {
+    if (!user) return;
+
     try {
       setLoadingData(true);
 
@@ -88,26 +103,13 @@ export default function SummaryPage() {
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [updateCurrentMonthData, user]);
 
-  const updateCurrentMonthData = (monthData) => {
-    const categories = Object.entries(monthData.categories).map(([name, amount]) => ({
-      name,
-      amount,
-      percentage: ((amount / monthData.total) * 100).toFixed(1),
-    }));
-
-    const chartData = categories.map((cat) => ({
-      name: cat.name,
-      value: cat.amount,
-    }));
-
-    setCurrentMonthData({
-      total: monthData.total,
-      categories,
-      chartData,
-    });
-  };
+  useEffect(() => {
+    if (user) {
+      fetchSummaryData();
+    }
+  }, [user, fetchSummaryData]);
 
   const handleMonthChange = (monthKey) => {
     setSelectedMonth(monthKey);

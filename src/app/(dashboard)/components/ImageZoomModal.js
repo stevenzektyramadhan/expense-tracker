@@ -1,10 +1,21 @@
 "use client";
 
+import Image from "next/image";
+
 export default function ImageZoomModal({ imageUrl, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-      <img src={imageUrl} alt="Zoomed" className="max-h-[90%] max-w-[90%] object-contain" />
-      <button className="absolute top-4 right-4 text-white text-2xl" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+      <div className="relative h-[80vh] w-[90vw] max-w-4xl">
+        <Image
+          src={imageUrl}
+          alt="Zoomed receipt"
+          fill
+          sizes="100vw"
+          className="object-contain"
+          priority
+        />
+      </div>
+      <button className="absolute top-4 right-4 text-2xl text-white" onClick={onClose}>
         ✕
       </button>
     </div>
