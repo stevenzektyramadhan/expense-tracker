@@ -9,7 +9,13 @@ export default function AllowancePage() {
   const [amount, setAmount] = useState("");
 
   const handleSave = async () => {
-    const { error } = await setAllowance(user.id, parseFloat(amount));
+    if (!user) return;
+
+    const parsedAmount = parseFloat(amount);
+    const { error } = await setAllowance({
+      userId: user.id,
+      amount: parsedAmount,
+    });
     if (error) {
       Swal.fire("Error", "Gagal menyimpan uang saku", "error");
     } else {
