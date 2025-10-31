@@ -77,3 +77,26 @@ export async function deductAllowance(userId, amount) {
 
   return { data, error: updateError };
 }
+
+export async function setAllowance({ userId, amount, month, year, remaining }) {
+  const now = new Date();
+  const allowanceMonth = month ?? now.getMonth() + 1;
+  const allowanceYear = year ?? now.getFullYear();
+  const allowanceRemaining = typeof remaining === "number" ? remaining : amount;
+
+  const payload = {
+    user_id: userId,
+    amount,
+    remaining: allowanceRemaining,
+    month: allowanceMonth,
+    year: allowanceYear,
+  };
+
+  const { data, error } = await supabase
+    .from("allowances")
+    .upsert(payload, { onConflict: "user_id,month,year" })
+    .select()
+    .maybeSingle();
+
+  return { data, error };
+}

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { getExpenses, supabase } from "@/lib/supabaseClient";
@@ -30,35 +30,83 @@ export default function DashboardPage() {
     sort: "date-desc",
   });
   const [open, setOpen] = useState(false);
+  const allowancePromptPeriodRef = useRef(null);
+
+  // 🔹 Cek allowance bulan ini, kalau belum ada → buat
+  const loadAllowance = useCallback(
+    async ({ shouldPrompt = false } = {}) => {
+      if (!user) return;
+
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const periodKey = `${year}-${month}`;
+      const sessionKey = `allowancePrompted:${user.id}:${periodKey}`;
+      const hasPromptedThisSession =
+        allowancePromptPeriodRef.current === periodKey ||
+        (typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "true");
+
+      const markPeriodHandled = () => {
+        allowancePromptPeriodRef.current = periodKey;
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(sessionKey, "true");
+        }
+      };
+
+      const { data, error } = await supabase
+        .from("allowances")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("month", month)
+        .eq("year", year)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Failed to load allowance", error);
+        setAllowance(null);
+
+        if (shouldPrompt && !hasPromptedThisSession) {
+          setOpen(true);
+          markPeriodHandled();
+        }
+        return;
+      }
+
+      if (data) {
+        setAllowance(data);
+        markPeriodHandled();
+        return;
+      }
+
+      setAllowance(null);
+
+      if (shouldPrompt && !hasPromptedThisSession) {
+        setOpen(true);
+        markPeriodHandled();
+      }
+    },
+    [user]
+  );
+
+  const loadExpenses = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await getExpenses(user.id);
+    if (error) {
+      setError(error.message);
+    } else {
+      setError("");
+      setExpenses(data || []);
+    }
+    setLoading(false);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
-      loadAllowance();
+      loadAllowance({ shouldPrompt: true });
       loadExpenses();
     }
-  }, [user]);
-
-  // 🔹 Cek allowance bulan ini, kalau belum ada → buat
-  const loadAllowance = async () => {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-
-    const { data, error } = await supabase.from("allowances").select("*").eq("user_id", user.id).eq("month", month).eq("year", year).single();
-
-    if (data) {
-      setAllowance(data);
-    } else {
-      setAllowance(null); // tetap render, tapi kosong
-    }
-  };
-  const loadExpenses = async () => {
-    setLoading(true);
-    const { data, error } = await getExpenses(user.id);
-    if (error) setError(error.message);
-    else setExpenses(data || []);
-    setLoading(false);
-  };
+  }, [user, loadAllowance, loadExpenses]);
 
   const handleDelete = async (id) => {
     const result = await Swal.fire({

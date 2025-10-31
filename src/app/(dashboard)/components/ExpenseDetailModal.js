@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default function ExpenseDetailModal({ expense, onClose, onEdit, onDelete, onZoom }) {
@@ -15,7 +17,18 @@ export default function ExpenseDetailModal({ expense, onClose, onEdit, onDelete,
 
         {/* Foto Struk */}
         {expense.receipt_url ? (
-          <img src={expense.receipt_url} alt="Bukti Struk" className="rounded mb-3 max-h-60 w-auto mx-auto object-contain cursor-pointer hover:opacity-90" onClick={() => onZoom(expense.receipt_url)} />
+          <div
+            className="relative mx-auto mb-3 h-60 w-full max-w-xs cursor-pointer"
+            onClick={() => onZoom(expense.receipt_url)}
+          >
+            <Image
+              src={expense.receipt_url}
+              alt="Bukti Struk"
+              fill
+              sizes="(max-width: 640px) 80vw, 320px"
+              className="rounded object-contain hover:opacity-90"
+            />
+          </div>
         ) : (
           <p className="text-sm text-black mb-3">Tidak ada foto struk</p>
         )}
