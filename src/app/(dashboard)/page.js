@@ -41,6 +41,17 @@ export default function DashboardPage() {
       const month = now.getMonth() + 1;
       const year = now.getFullYear();
       const periodKey = `${year}-${month}`;
+      const sessionKey = `allowancePrompted:${user.id}:${periodKey}`;
+      const hasPromptedThisSession =
+        allowancePromptPeriodRef.current === periodKey ||
+        (typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "true");
+
+      const markPeriodHandled = () => {
+        allowancePromptPeriodRef.current = periodKey;
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(sessionKey, "true");
+        }
+      };
 
       const { data, error } = await supabase
         .from("allowances")
@@ -54,23 +65,24 @@ export default function DashboardPage() {
         console.error("Failed to load allowance", error);
         setAllowance(null);
 
-        if (shouldPrompt && allowancePromptPeriodRef.current !== periodKey) {
+        if (shouldPrompt && !hasPromptedThisSession) {
           setOpen(true);
-          allowancePromptPeriodRef.current = periodKey;
+          markPeriodHandled();
         }
         return;
       }
 
       if (data) {
         setAllowance(data);
-        allowancePromptPeriodRef.current = periodKey;
-      } else {
-        setAllowance(null);
+        markPeriodHandled();
+        return;
+      }
 
-        if (shouldPrompt && allowancePromptPeriodRef.current !== periodKey) {
-          setOpen(true);
-          allowancePromptPeriodRef.current = periodKey;
-        }
+      setAllowance(null);
+
+      if (shouldPrompt && !hasPromptedThisSession) {
+        setOpen(true);
+        markPeriodHandled();
       }
     },
     [user]
