@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import MobileSummary from "@/components/mobile/MobileSummary";
 
 export default function SummaryPage() {
   const { user, loading } = useAuth();
@@ -153,108 +154,110 @@ export default function SummaryPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Ringkasan Bulanan</h1>
-        <p className="text-gray-600">Lihat pengeluaran Anda berdasarkan bulan dan kategori</p>
+    <>
+      <div className="hidden md:block max-w-4xl mx-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Ringkasan Bulanan</h1>
+          <p className="text-gray-600">Lihat pengeluaran Anda berdasarkan bulan dan kategori</p>
+        </div>
+
+        {monthlyData.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">📊</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada data pengeluaran</h3>
+            <p className="text-gray-600 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
+            <button onClick={() => router.push("/add")} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              Tambah Pengeluaran
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Month Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Bulan</label>
+              <select value={selectedMonth} onChange={(e) => handleMonthChange(e.target.value)} className="px-3 py-2 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                {monthlyData.map((month) => (
+                  <option key={month.key} value={month.key}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Current Month Summary */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">{monthlyData.find((m) => m.key === selectedMonth)?.label}</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Categories List */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-3">Pengeluaran per Kategori</h3>
+                  <div className="space-y-3">
+                    {currentMonthData.categories.map((category, index) => (
+                      <div key={category.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <span className="font-medium text-gray-900">{category.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-blue-600 font-semibold">{formatCurrency(category.amount)}</p>
+                          <p className="text-sm text-gray-600">{category.percentage}%</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pie Chart */}
+                <div className="h-64">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={currentMonthData.chartData} dataKey="value" nameKey="name" outerRadius={80} label>
+                        {currentMonthData.chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Breakdown */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ringkasan Bulanan</h3>
+              <div className="space-y-3">
+                {monthlyData.map((month) => (
+                  <div key={month.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-900">{month.label}</p>
+                      <p className="text-sm text-gray-600">{month.expenses.length} transaksi</p>
+                    </div>
+                    <p className="text-blue-600 font-semibold">{formatCurrency(month.total)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {monthlyData.length === 0 ? (
-        <div className="text-center py-12">
+      {monthlyData.length > 0 ? (
+        <div className="md:hidden">
+          <MobileSummary monthlyData={monthlyData} selectedMonth={selectedMonth} onMonthChange={handleMonthChange} currentMonthData={currentMonthData} />
+        </div>
+      ) : (
+        <div className="md:hidden text-center py-12 px-4">
           <div className="text-gray-400 text-6xl mb-4">📊</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada data pengeluaran</h3>
-          <p className="text-gray-600 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
-          <button onClick={() => router.push("/add")} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <h3 className="text-lg font-medium text-white mb-2">Belum ada data pengeluaran</h3>
+          <p className="text-gray-400 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
+          <button onClick={() => router.push("/add")} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg">
             Tambah Pengeluaran
           </button>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Month Selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Bulan</label>
-            <select value={selectedMonth} onChange={(e) => handleMonthChange(e.target.value)} className="px-3 py-2 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-              {monthlyData.map((month) => (
-                <option key={month.key} value={month.key}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Current Month Summary */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{monthlyData.find((m) => m.key === selectedMonth)?.label}</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Categories List */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-3">Pengeluaran per Kategori</h3>
-                <div className="space-y-3">
-                  {currentMonthData.categories.map((category, index) => (
-                    <div key={category.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span className="font-medium text-gray-900">{category.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-gray-900">{formatCurrency(category.amount)}</div>
-                        <div className="text-sm text-gray-500">{category.percentage}%</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-gray-900">Total:</span>
-                    <span className="text-lg font-bold text-blue-600">{formatCurrency(currentMonthData.total)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pie Chart */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-3">Visualisasi</h3>
-                {currentMonthData.chartData.length > 0 ? (
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={currentMonthData.chartData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value">
-                          {currentMonthData.chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-gray-500">Tidak ada data untuk bulan ini</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* All Months Overview */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Ringkasan Semua Bulan</h2>
-            <div className="space-y-3">
-              {monthlyData.map((month) => (
-                <div
-                  key={month.key}
-                  className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${selectedMonth === month.key ? "bg-blue-50 border-blue-200" : "bg-gray-50 hover:bg-gray-100"}`}
-                  onClick={() => handleMonthChange(month.key)}
-                >
-                  <span className="font-medium text-gray-900">{month.label}</span>
-                  <span className="font-semibold text-gray-900">{formatCurrency(month.total)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       )}
-    </div>
+    </>
   );
 }
