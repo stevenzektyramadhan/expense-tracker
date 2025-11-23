@@ -37,8 +37,8 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* NAVBAR */}
-      <nav className="bg-white shadow">
+      {/* NAVBAR (desktop only) */}
+      <nav className="hidden md:block bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             {/* LEFT: Logo + Desktop Menu */}
@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }) {
               </button>
             </div>
 
-            {/* MOBILE: Hamburger Button */}
+            {/* MOBILE: Hamburger Button (kept for consistency but hidden with nav) */}
             <div className="sm:hidden flex items-center">
               <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-md text-gray-600 hover:text-indigo-600 focus:outline-none">
                 {isOpen ? (
@@ -91,7 +91,7 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-        {/* MOBILE MENU DROPDOWN */}
+        {/* MOBILE MENU DROPDOWN (desktop view only) */}
         {isOpen && (
           <div className="sm:hidden px-4 pb-4 space-y-2 animate-slide-down">
             <Link href="/" className="block text-gray-700 hover:text-indigo-600" onClick={() => setIsOpen(false)}>
@@ -120,9 +120,9 @@ export default function DashboardLayout({ children }) {
         )}
       </nav>
 
-      {/* MAIN CONTENT */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">{children}</div>
+      {/* MAIN CONTENT: children handle their own responsive layouts */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 px-0">
+        <div className="px-0 sm:px-0 lg:px-0">{children}</div>
       </main>
     </div>
   );
