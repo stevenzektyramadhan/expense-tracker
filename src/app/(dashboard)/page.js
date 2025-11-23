@@ -14,6 +14,7 @@ import ImageZoomModal from "./components/ImageZoomModal";
 import DashboardFilters from "./components/DashboardFilters";
 import AllowanceModal from "./components/AllowanceModal";
 import MobileDashboard from "@/components/mobile/MobileDashboard";
+import MobileExpenseDetailSheet from "@/components/mobile/MobileExpenseDetailSheet";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -232,11 +233,37 @@ export default function DashboardPage() {
       </div>
 
       <div className="md:hidden">
-        <MobileDashboard user={user} expenses={expenses} allowance={allowance} />
+        <MobileDashboard
+          user={user}
+          expenses={expenses}
+          allowance={allowance}
+          onSelectExpense={setSelectedExpense}
+        />
       </div>
 
       {/* Modals */}
-      {selectedExpense && <ExpenseDetailModal expense={selectedExpense} onClose={() => setSelectedExpense(null)} onEdit={setEditingExpense} onDelete={handleDelete} onZoom={setZoomImage} />}
+      {selectedExpense && (
+        <>
+          <div className="hidden md:block">
+            <ExpenseDetailModal
+              expense={selectedExpense}
+              onClose={() => setSelectedExpense(null)}
+              onEdit={setEditingExpense}
+              onDelete={handleDelete}
+              onZoom={setZoomImage}
+            />
+          </div>
+          <div className="md:hidden">
+            <MobileExpenseDetailSheet
+              expense={selectedExpense}
+              onClose={() => setSelectedExpense(null)}
+              onEdit={setEditingExpense}
+              onDelete={handleDelete}
+              onZoom={setZoomImage}
+            />
+          </div>
+        </>
+      )}
 
       {editingExpense && <EditExpenseModal expense={editingExpense} onClose={() => setEditingExpense(null)} onUpdate={handleUpdate} />}
 

@@ -28,7 +28,7 @@ const getCategoryColor = (category) => {
   return colors[category] || "bg-gray-500";
 };
 
-export default function MobileDashboard({ user, expenses = [], allowance }) {
+export default function MobileDashboard({ user, expenses = [], allowance, onSelectExpense = () => {} }) {
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchDesc, setSearchDesc] = useState("");
@@ -175,7 +175,12 @@ export default function MobileDashboard({ user, expenses = [], allowance }) {
 
           <div className="space-y-3">
             {filteredExpenses.map((expense) => (
-              <div key={expense.id} className="bg-gray-800 rounded-2xl p-4 flex items-center justify-between">
+              <button
+                key={expense.id}
+                type="button"
+                onClick={() => onSelectExpense(expense)}
+                className="bg-gray-800 rounded-2xl p-4 w-full flex items-center justify-between text-left hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 ${getCategoryColor(expense.category)} rounded-full flex items-center justify-center`}>
                     <span className="text-white text-lg">💰</span>
@@ -189,7 +194,7 @@ export default function MobileDashboard({ user, expenses = [], allowance }) {
                   <p className="font-semibold text-white">{expense.category}</p>
                   <p className="text-green-400 text-xs">Rp {formatCurrency(expense.amount)}</p>
                 </div>
-              </div>
+              </button>
             ))}
 
             {filteredExpenses.length === 0 && (
