@@ -1,6 +1,9 @@
 "use client";
 
+import { Legend, Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import MobileShell from "./MobileShell";
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
 const getCategoryColor = (category) => {
   const colors = {
@@ -15,6 +18,23 @@ const getCategoryColor = (category) => {
 };
 
 const formatCurrency = (amount) => new Intl.NumberFormat("id-ID").format(amount || 0);
+
+const renderLabel = ({ percent }) => `${(percent * 100).toFixed(0)}%`;
+
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const { name, value, percent } = payload[0];
+
+    return (
+      <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg border border-gray-700">
+        <p className="font-semibold">{name}</p>
+        <p className="text-purple-300">Rp {formatCurrency(value)}</p>
+        <p className="text-xs text-gray-300">{(percent * 100).toFixed(1)}%</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function MobileSummary({ monthlyData = [], selectedMonth, onMonthChange, currentMonthData }) {
   const selectedLabel = monthlyData.find((m) => m.key === selectedMonth)?.label || "Semua Bulan";
@@ -71,13 +91,32 @@ export default function MobileSummary({ monthlyData = [], selectedMonth, onMonth
 
           <div className="mt-8">
             <p className="text-sm text-gray-400 mb-4">Visualisasi</p>
-            <div className="flex items-center justify-center py-8">
-              {currentMonthData.categories.length > 0 ? (
-                <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
-                  <div className="text-center text-white">
-                    <div className="text-3xl font-bold">{currentMonthData.categories.length}</div>
-                    <div className="text-sm opacity-90">Kategori</div>
-                  </div>
+            <div className="flex items-center justify-center py-4">
+              {currentMonthData.chartData.length > 0 ? (
+                <div className="w-full h-64">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={currentMonthData.chartData}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={90}
+                        label={renderLabel}
+                        labelLine={false}
+                      >
+                        {currentMonthData.chartData.map((entry, index) => (
+                          <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend
+                        layout="horizontal"
+                        align="center"
+                        verticalAlign="bottom"
+                        wrapperStyle={{ color: "#e5e7eb" }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
               ) : (
                 <div className="w-48 h-48 rounded-full bg-gray-700 flex items-center justify-center">
@@ -87,14 +126,6 @@ export default function MobileSummary({ monthlyData = [], selectedMonth, onMonth
                 </div>
               )}
             </div>
-            {currentMonthData.categories.length > 0 && (
-              <div className="text-center mt-4">
-                <div className="inline-flex items-center gap-2 bg-gray-700 rounded-lg px-4 py-2">
-                  <div className={`w-3 h-3 ${getCategoryColor(currentMonthData.categories[0].name)} rounded-sm`} />
-                  <span className="text-sm text-white">{currentMonthData.categories[0].name}</span>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
