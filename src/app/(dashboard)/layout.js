@@ -37,6 +37,24 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* MOBILE TOP BAR */}
+      <div className="md:hidden sticky top-0 z-30 bg-white/90 backdrop-blur shadow-sm border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="text-lg font-semibold text-indigo-600">
+            Expense Tracker
+          </Link>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 max-w-[120px] truncate">{user.email}</span>
+            <button
+              onClick={handleSignOut}
+              className="px-3 py-2 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] transition"
+            >
+              Keluar
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* NAVBAR (desktop only) */}
       <nav className="hidden md:block bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
