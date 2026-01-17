@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signUp } from "@/lib/supabaseClient";
 
 export default function RegisterPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,7 +26,8 @@ export default function RegisterPage() {
       return;
     }
 
-    const { data, error } = await signUp(email, password);
+    // ✅ Pass fullName to signUp - akan disimpan di user_metadata
+    const { data, error } = await signUp(email, password, fullName);
 
     if (error) {
       setError(error.message);
@@ -53,6 +55,23 @@ export default function RegisterPage() {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {/* Nama Lengkap - akan disimpan di user_metadata */}
+            <div>
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                Nama Lengkap
+              </label>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                autoComplete="name"
+                required
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="Masukkan nama lengkap"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email

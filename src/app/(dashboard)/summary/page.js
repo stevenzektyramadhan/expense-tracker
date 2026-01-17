@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import MobileSummary from "@/components/mobile/MobileSummary";
@@ -19,88 +18,80 @@ export default function SummaryPage() {
   });
   const [selectedMonth, setSelectedMonth] = useState("");
   const [loadingData, setLoadingData] = useState(true);
+  
+  // ✅ Store category data per month (from API)
+  const [categoryByMonth, setCategoryByMonth] = useState({});
 
   // Colors for pie chart
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
-  const updateCurrentMonthData = useCallback((monthData) => {
-    const categories = Object.entries(monthData.categories).map(([name, amount]) => ({
-      name,
-      amount,
-      percentage: ((amount / monthData.total) * 100).toFixed(1),
+  // ✅ Updated to work with pre-aggregated data from API
+  const updateCurrentMonthData = useCallback((monthKey, categoryData, monthTotal) => {
+    // Calculate percentages for each category
+    const categories = categoryData.map((cat) => ({
+      name: cat.name,
+      amount: cat.amount,
+      percentage: monthTotal > 0 ? ((cat.amount / monthTotal) * 100).toFixed(1) : 0,
     }));
 
+    // Format data for pie chart
     const chartData = categories.map((cat) => ({
       name: cat.name,
       value: cat.amount,
     }));
 
     setCurrentMonthData({
-      total: monthData.total,
+      total: monthTotal,
       categories,
       chartData,
     });
   }, []);
 
+  // ✅ Refactored to use the new /api/summary endpoint
+  // This is MUCH more efficient because:
+  // 1. Database does all the grouping and summing (not JavaScript)
+  // 2. Only aggregated results are sent over the network (tiny payload)
+  // 3. No memory overhead from loading thousands of raw expense records
   const fetchSummaryData = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoadingData(true);
 
-      // Get all expenses for the user
-      const { data: expenses, error } = await supabase.from("expenses").select("*").eq("user_id", user.id).order("date", { ascending: false });
+      // ✅ Fetch pre-aggregated data from API
+      const response = await fetch(`/api/summary?user_id=${user.id}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Gagal mengambil data ringkasan");
+      }
 
-      if (error) throw error;
+      const data = await response.json();
 
-      // Group expenses by month
-      const monthlyGroups = {};
-      expenses.forEach((expense) => {
-        const date = new Date(expense.date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        const monthLabel = date.toLocaleDateString("id-ID", {
-          year: "numeric",
-          month: "long",
-        });
+      // ✅ Data already aggregated by the API - no client-side processing needed!
+      // Structure: { totalExpense, totalTransactions, expensesByCategory, expensesByMonth, categoryByMonth }
+      
+      // Store monthly data directly from API (no transformation needed)
+      setMonthlyData(data.expensesByMonth);
+      setCategoryByMonth(data.categoryByMonth);
 
-        if (!monthlyGroups[monthKey]) {
-          monthlyGroups[monthKey] = {
-            key: monthKey,
-            label: monthLabel,
-            total: 0,
-            categories: {},
-            expenses: [],
-          };
-        }
-
-        monthlyGroups[monthKey].total += expense.amount;
-        monthlyGroups[monthKey].expenses.push(expense);
-
-        if (!monthlyGroups[monthKey].categories[expense.category]) {
-          monthlyGroups[monthKey].categories[expense.category] = 0;
-        }
-        monthlyGroups[monthKey].categories[expense.category] += expense.amount;
-      });
-
-      // Convert to array and sort by month (newest first)
-      const monthlyArray = Object.values(monthlyGroups).sort((a, b) => b.key.localeCompare(a.key));
-
-      setMonthlyData(monthlyArray);
-
-      // Set current month as default
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const currentMonthSummary = monthlyArray.find((m) => m.key === currentMonth);
+      // Set current month as default, or use the first available month
+      const currentMonthKey = new Date().toISOString().slice(0, 7);
+      const currentMonthSummary = data.expensesByMonth.find((m) => m.key === currentMonthKey);
 
       if (currentMonthSummary) {
-        setSelectedMonth(currentMonth);
-        updateCurrentMonthData(currentMonthSummary);
-      } else if (monthlyArray.length > 0) {
-        setSelectedMonth(monthlyArray[0].key);
-        updateCurrentMonthData(monthlyArray[0]);
+        setSelectedMonth(currentMonthKey);
+        const catData = data.categoryByMonth[currentMonthKey] || [];
+        updateCurrentMonthData(currentMonthKey, catData, currentMonthSummary.total);
+      } else if (data.expensesByMonth.length > 0) {
+        const firstMonth = data.expensesByMonth[0];
+        setSelectedMonth(firstMonth.key);
+        const catData = data.categoryByMonth[firstMonth.key] || [];
+        updateCurrentMonthData(firstMonth.key, catData, firstMonth.total);
       }
     } catch (error) {
       console.error("Error fetching summary data:", error);
-      alert("Gagal mengambil data ringkasan");
+      alert(error.message || "Gagal mengambil data ringkasan");
     } finally {
       setLoadingData(false);
     }
@@ -112,11 +103,13 @@ export default function SummaryPage() {
     }
   }, [user, fetchSummaryData]);
 
+  // ✅ Updated to use categoryByMonth from API response
   const handleMonthChange = (monthKey) => {
     setSelectedMonth(monthKey);
     const monthData = monthlyData.find((m) => m.key === monthKey);
     if (monthData) {
-      updateCurrentMonthData(monthData);
+      const catData = categoryByMonth[monthKey] || [];
+      updateCurrentMonthData(monthKey, catData, monthData.total);
     }
   };
 
@@ -233,7 +226,7 @@ export default function SummaryPage() {
                   <div key={month.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
                       <p className="font-medium text-gray-900">{month.label}</p>
-                      <p className="text-sm text-gray-600">{month.expenses.length} transaksi</p>
+                      <p className="text-sm text-gray-600">{month.transactionCount} transaksi</p>
                     </div>
                     <p className="text-blue-600 font-semibold">{formatCurrency(month.total)}</p>
                   </div>

@@ -16,8 +16,16 @@ export const metadata = {
   description: "Catat pengeluaran pribadimu dengan mudah",
   manifest: "/manifest.json",
 };
+// =============================================================================
+// VIEWPORT CONFIGURATION
+// =============================================================================
+// viewportFit: 'cover' is REQUIRED for safe-area-inset CSS values to work.
+// This tells the browser to extend the webpage into the notch/home indicator
+// areas, and then we use CSS env() variables to add appropriate padding.
+// Without this, env(safe-area-inset-bottom) would always be 0.
 export const viewport = {
   themeColor: "#4f46e5",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {

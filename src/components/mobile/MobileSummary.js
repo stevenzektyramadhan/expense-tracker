@@ -134,7 +134,10 @@ export default function MobileSummary({ monthlyData = [], selectedMonth, onMonth
           <div className="space-y-3">
             {monthlyData.map((item) => (
               <div key={item.key} className="flex justify-between items-center py-3 border-b border-gray-700 last:border-b-0">
-                <span className="text-gray-300">{item.label}</span>
+                <div>
+                  <span className="text-gray-300 block">{item.label}</span>
+                  <span className="text-xs text-gray-500">{item.transactionCount} transaksi</span>
+                </div>
                 <span className="font-bold text-white">Rp {formatCurrency(item.total)}</span>
               </div>
             ))}
