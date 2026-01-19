@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import MobileShell from "./MobileShell";
-
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(Number(value) || 0);
+import { formatRupiah, parseRupiah } from "@/lib/utils";
 
 export default function MobileAddExpense({
   formData,
@@ -25,6 +23,29 @@ export default function MobileAddExpense({
     []
   );
 
+  // ✅ Local state untuk display format Rupiah
+  const [displayAmount, setDisplayAmount] = useState("");
+
+  // ✅ Sync displayAmount dengan formData.amount dari parent
+  useEffect(() => {
+    setDisplayAmount(formatRupiah(formData.amount));
+  }, [formData.amount]);
+
+  // ✅ Handler untuk input amount dengan auto-format
+  const handleAmountChange = (e) => {
+    const inputValue = e.target.value;
+    const numericValue = parseRupiah(inputValue);
+    
+    // Update parent formData dengan angka bersih
+    setFormData((prev) => ({
+      ...prev,
+      amount: numericValue || "",
+    }));
+    
+    // Update local display dengan format Rupiah
+    setDisplayAmount(formatRupiah(numericValue));
+  };
+
   return (
     <MobileShell>
       <div className="p-6 space-y-5">
@@ -34,13 +55,13 @@ export default function MobileAddExpense({
         <div className="bg-gray-800 rounded-2xl p-5">
           <label className="text-sm text-gray-400 mb-3 block">Jumlah Pengeluaran *</label>
           <input
-            type="number"
-            value={formData.amount}
-            onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
+            type="text"
+            value={displayAmount}
+            onChange={handleAmountChange}
             placeholder="Rp 0"
+            inputMode="numeric"
             className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 text-2xl font-bold"
           />
-          <p className="text-xs text-gray-400 mt-2">{formatCurrency(formData.amount || 0)}</p>
         </div>
 
         <div className="bg-gray-800 rounded-2xl p-5 space-y-3">

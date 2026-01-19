@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase, deductAllowance } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
+import { formatRupiah, parseRupiah } from "@/lib/utils";
 import CategorySelect from "../components/CategorySelect";
 import Swal from "sweetalert2";
 import MobileAddExpense from "@/components/mobile/MobileAddExpense";
@@ -26,6 +26,31 @@ export default function AddExpensePage() {
   const [receipt, setReceipt] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // ✅ State untuk display format Rupiah (terpisah dari formData.amount)
+  const [displayAmount, setDisplayAmount] = useState("");
+
+  // ✅ Sync displayAmount ketika formData.amount berubah (misal saat initial load)
+  useEffect(() => {
+    setDisplayAmount(formatRupiah(formData.amount));
+  }, [formData.amount]);
+
+  // ✅ Handler khusus untuk input amount dengan auto-format
+  const handleAmountChange = (e) => {
+    const inputValue = e.target.value;
+    
+    // Parse ke angka bersih (hapus Rp, titik, dll)
+    const numericValue = parseRupiah(inputValue);
+    
+    // Update formData dengan angka bersih (untuk API)
+    setFormData((prev) => ({
+      ...prev,
+      amount: numericValue || "",  // Simpan "" jika 0 untuk validasi required
+    }));
+    
+    // Update display dengan format Rupiah
+    setDisplayAmount(formatRupiah(numericValue));
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -92,38 +117,43 @@ export default function AddExpensePage() {
     }
 
     try {
-      const { error } = await supabase.from("expenses").insert([
-        {
+      // ✅ Kirim data ke API /api/expenses
+      // API sudah menangani insert expense + update allowance dalam satu transaksi
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           user_id: user.id,
           amount: parseFloat(formData.amount),
-          category: selectedCategory === "Lainnya" ? customCategory || "Lainnya" : selectedCategory, // ✅ pakai custom kalau pilih lainnya
+          category: selectedCategory === "Lainnya" ? customCategory || "Lainnya" : selectedCategory,
           date: formData.date,
           description: formData.description,
           receipt_url: receiptUrl, // ✅ aman meskipun null
-        },
-      ]);
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      // ✅ setelah insert -> update allowance
-      const { error: allowanceError } = await deductAllowance(user.id, parseFloat(formData.amount));
-
-      if (allowanceError) {
-        await Swal.fire("Warning", "Pengeluaran tersimpan, tapi gagal update uang saku.", "warning");
-      } else {
-        await Swal.fire({
-          icon: "success",
-          title: "Berhasil!",
-          text: "Pengeluaran berhasil ditambahkan & uang saku diperbarui!",
-          timer: 1500,
-          showConfirmButton: false,
-        });
+      if (!response.ok) {
+        // Handle specific error messages from API
+        throw new Error(result.error || "Gagal menyimpan pengeluaran");
       }
+
+      // ✅ Sukses! Transaksi expense + allowance sudah ditangani API
+      await Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Pengeluaran berhasil ditambahkan & uang saku diperbarui!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
 
       router.push("/");
     } catch (err) {
       console.error("Error saving expense:", err.message);
-      await Swal.fire("Error", "Gagal menyimpan pengeluaran. Silakan coba lagi.", "error");
+      await Swal.fire("Error", err.message || "Gagal menyimpan pengeluaran. Silakan coba lagi.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -156,21 +186,17 @@ export default function AddExpensePage() {
             <label htmlFor="amount" className="block text-sm font-medium text-black mb-2">
               Jumlah Pengeluaran *
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 ">Rp</span>
-              <input
-                type="number"
-                id="amount"
-                name="amount"
-                value={formData.amount}
-                onChange={handleInputChange}
-                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0"
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
+            <input
+              type="text"
+              id="amount"
+              name="amount"
+              value={displayAmount}
+              onChange={handleAmountChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+              placeholder="Rp 0"
+              inputMode="numeric"
+              required
+            />
           </div>
 
           {/* ✅ Category pakai reusable */}

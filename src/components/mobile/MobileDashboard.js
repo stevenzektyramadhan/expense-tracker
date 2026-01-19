@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Search } from "./icons";
 import MobileShell from "./MobileShell";
+import Swal from "sweetalert2";
+import { supabase } from "@/lib/supabaseClient";
 
 const formatCurrency = (amount = 0) => new Intl.NumberFormat("id-ID").format(amount);
 
@@ -29,10 +32,84 @@ const getCategoryColor = (category) => {
 };
 
 export default function MobileDashboard({ user, expenses = [], allowance, onSelectExpense = () => {} }) {
+  const router = useRouter();
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchDesc, setSearchDesc] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
+
+  // =============================================================================
+  // MISSING INFORMATION DETECTOR
+  // =============================================================================
+  /**
+   * This useEffect detects old users who registered before the full_name field
+   * was added to the registration form. When detected, it prompts them to add
+   * their name for a more personalized experience.
+   * 
+   * HOW supabase.auth.updateUser() WORKS:
+   * -------------------------------------
+   * - `updateUser()` patches the currently authenticated user's data
+   * - The `data` object parameter maps directly to `user_metadata`
+   * - This is a PATCH operation: only specified fields are updated
+   * - No separate database query is needed - Supabase Auth handles it
+   * - The updated user_metadata becomes available on the next getUser() call
+   * - Benefits: Simple, atomic update without managing a profiles table
+   * 
+   * Example: supabase.auth.updateUser({ data: { full_name: "John" } })
+   * This only updates full_name, leaving other metadata fields untouched.
+   */
+  useEffect(() => {
+    // Skip if no user or if they already have a full_name
+    if (!user || user.user_metadata?.full_name) return;
+
+    const promptForName = async () => {
+      const result = await Swal.fire({
+        title: "Satu langkah lagi!",
+        text: "Demi kenyamanan, boleh kami tahu siapa nama panggilan Anda?",
+        input: "text",
+        inputPlaceholder: "Masukkan nama Anda...",
+        allowOutsideClick: false,    // Force user to complete the form
+        allowEscapeKey: false,       // Prevent escape key from closing
+        showCancelButton: false,     // No cancel button - they must fill it
+        confirmButtonText: "Simpan",
+        confirmButtonColor: "#9333ea", // Purple to match the app theme
+        inputValidator: (value) => {
+          // Validation: input cannot be empty
+          if (!value || !value.trim()) {
+            return "Nama tidak boleh kosong!";
+          }
+          return null;
+        },
+      });
+
+      if (result.isConfirmed && result.value) {
+        // Update user_metadata with the new full_name
+        const { error } = await supabase.auth.updateUser({
+          data: { full_name: result.value.trim() },
+        });
+
+        if (error) {
+          Swal.fire("Error", "Gagal menyimpan nama. Silakan coba lagi.", "error");
+        } else {
+          // Success - use Next.js router.refresh() instead of window.location.reload()
+          // router.refresh() re-fetches the route's data without a full page reload,
+          // which is compatible with Next.js App Router and won't break the layout
+          Swal.fire({
+            title: "Terima kasih!",
+            text: `Halo, ${result.value.trim()}! Selamat datang.`,
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+          }).then(() => {
+            router.refresh();
+          });
+        }
+      }
+    };
+
+    promptForName();
+  }, [user]); // Re-run only when user object changes
+
 
   const uniqueMonths = useMemo(() => [...new Set(expenses.map((e) => getMonthName(e.date)))], [expenses]);
   const categories = useMemo(() => {
@@ -83,12 +160,25 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
   return (
     <MobileShell>
       <div className="p-6">
+        {/* ===================================================================
+            USER GREETING SECTION
+            ===================================================================
+            Displays user's full name from user_metadata if available.
+            Falls back to email for users who registered before we added
+            the full_name field (backward compatibility).
+            
+            user_metadata is set during signUp via options.data and is
+            automatically available on the user object after login.
+        */}
         <div className="flex justify-between items-start mb-6">
-          <div>
+          <div className="min-w-0 flex-1 mr-3">
             <p className="text-gray-400 text-sm mb-1">Welcome back</p>
-            <h1 className="text-2xl font-bold">{user?.email || "Pengguna"}</h1>
+            <h1 className="text-2xl font-bold truncate">
+              {/* Prioritize full_name, fallback to email */}
+              {user?.user_metadata?.full_name || user?.email || "Pengguna"}
+            </h1>
           </div>
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500" aria-hidden />
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0" aria-hidden />
         </div>
 
         <div className="bg-gradient-to-r from-purple-600 to-pink-500 rounded-3xl p-6 mb-4">
