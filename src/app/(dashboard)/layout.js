@@ -27,7 +27,7 @@ export default function DashboardLayout({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -43,10 +43,10 @@ export default function DashboardLayout({ children }) {
           <div className="flex justify-between h-16">
             {/* LEFT: Logo + Desktop Menu */}
             <div className="flex">
-              {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <Link href="/" className="text-xl font-bold text-indigo-600">
-                  Expense Tracker
+                <Link href="/" className="text-xl font-bold">
+                  <span className="text-orange-500">kite</span>
+                  <span className="text-blue-600">Catat</span>
                 </Link>
               </div>
 
@@ -64,17 +64,16 @@ export default function DashboardLayout({ children }) {
               </div>
             </div>
 
-            {/* RIGHT: Desktop User Info */}
             <div className="hidden sm:flex items-center">
               <span className="text-gray-700 text-sm mr-4">{user.email}</span>
-              <button onClick={handleSignOut} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium">
+              <button onClick={handleSignOut} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium">
                 Keluar
               </button>
             </div>
 
             {/* MOBILE: Hamburger Button (kept for consistency but hidden with nav) */}
             <div className="sm:hidden flex items-center">
-              <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-md text-gray-600 hover:text-indigo-600 focus:outline-none">
+              <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-md text-gray-600 hover:text-blue-600 focus:outline-none">
                 {isOpen ? (
                   // X icon
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,13 +93,13 @@ export default function DashboardLayout({ children }) {
         {/* MOBILE MENU DROPDOWN (desktop view only) */}
         {isOpen && (
           <div className="sm:hidden px-4 pb-4 space-y-2 animate-slide-down">
-            <Link href="/" className="block text-gray-700 hover:text-indigo-600" onClick={() => setIsOpen(false)}>
+            <Link href="/" className="block text-gray-700 hover:text-blue-600" onClick={() => setIsOpen(false)}>
               Dashboard
             </Link>
-            <Link href="/add" className="block text-gray-700 hover:text-indigo-600" onClick={() => setIsOpen(false)}>
+            <Link href="/add" className="block text-gray-700 hover:text-blue-600" onClick={() => setIsOpen(false)}>
               Tambah Pengeluaran
             </Link>
-            <Link href="/summary" className="block text-gray-700 hover:text-indigo-600" onClick={() => setIsOpen(false)}>
+            <Link href="/summary" className="block text-gray-700 hover:text-blue-600" onClick={() => setIsOpen(false)}>
               Ringkasan
             </Link>
 
@@ -111,7 +110,7 @@ export default function DashboardLayout({ children }) {
                   setIsOpen(false);
                   handleSignOut();
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium w-full text-left"
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium w-full text-left"
               >
                 Keluar
               </button>

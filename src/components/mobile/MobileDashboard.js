@@ -72,7 +72,7 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
         allowEscapeKey: false,       // Prevent escape key from closing
         showCancelButton: false,     // No cancel button - they must fill it
         confirmButtonText: "Simpan",
-        confirmButtonColor: "#9333ea", // Purple to match the app theme
+        confirmButtonColor: "#2563eb", // Blue to match the app theme
         inputValidator: (value) => {
           // Validation: input cannot be empty
           if (!value || !value.trim()) {
@@ -178,25 +178,25 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
               {user?.user_metadata?.full_name || user?.email || "Pengguna"}
             </h1>
           </div>
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0" aria-hidden />
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-orange-500 flex-shrink-0" aria-hidden />
         </div>
 
-        <div className="bg-gradient-to-r from-purple-600 to-pink-500 rounded-3xl p-6 mb-4">
+        <div className="bg-gradient-to-r from-blue-600 to-orange-500 rounded-3xl p-6 mb-4">
           <p className="text-white text-sm mb-2 opacity-90">Balance</p>
           <h2 className="text-4xl font-bold text-white">Rp {formatCurrency(remainingBudget)}</h2>
         </div>
 
-        <div className="bg-gradient-to-r from-purple-700 to-purple-900 rounded-3xl p-6 mb-6">
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 rounded-3xl p-6 mb-6">
           <p className="text-white text-sm mb-2 opacity-90">Total Pengeluaran</p>
           <h3 className="text-2xl font-bold text-white">Rp {formatCurrency(totalExpense)}</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-purple-600 rounded-2xl p-4">
+          <div className="bg-blue-600 rounded-2xl p-4">
             <p className="text-white text-xs mb-1 opacity-90">Total Transaksi</p>
             <p className="text-2xl font-bold text-white">{expenses.length}</p>
           </div>
-          <div className="bg-purple-600 rounded-2xl p-4">
+          <div className="bg-orange-500 rounded-2xl p-4">
             <p className="text-white text-xs mb-1 opacity-90">Rata-rata Transaksi</p>
             <p className="text-lg font-bold text-white">Rp {formatCurrency(Math.round(avgPerTransaction))}</p>
           </div>
@@ -258,7 +258,7 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
         <div className="mb-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold">Transactions</h3>
-            <span className="text-purple-400 text-sm flex items-center">
+            <span className="text-orange-400 text-sm flex items-center">
               Sort by: {sortOrder === "newest" ? "Latest" : "Oldest"} <ChevronDown className="w-4 h-4 ml-1" />
             </span>
           </div>
@@ -269,7 +269,7 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
                 key={expense.id}
                 type="button"
                 onClick={() => onSelectExpense(expense)}
-                className="bg-gray-800 rounded-2xl p-4 w-full flex items-center justify-between text-left hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="bg-gray-800 rounded-2xl p-4 w-full flex items-center justify-between text-left hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 ${getCategoryColor(expense.category)} rounded-full flex items-center justify-center`}>

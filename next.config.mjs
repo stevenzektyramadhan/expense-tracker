@@ -10,6 +10,8 @@ const withPWA = withPWAInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Empty turbopack config to silence warning when using webpack plugins like next-pwa
+  turbopack: {},
   images: {
     // Using remotePatterns with wildcard to allow all HTTPS images
     // This replaces the deprecated 'domains' configuration
