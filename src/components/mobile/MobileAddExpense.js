@@ -60,7 +60,7 @@ export default function MobileAddExpense({
             onChange={handleAmountChange}
             placeholder="Rp 0"
             inputMode="numeric"
-            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 text-2xl font-bold"
+            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500 text-2xl font-bold"
           />
         </div>
 
@@ -69,7 +69,7 @@ export default function MobileAddExpense({
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500"
           >
             {categories.map((cat) => (
               <option key={cat} value={cat}>
@@ -83,7 +83,7 @@ export default function MobileAddExpense({
               value={customCategory}
               onChange={(e) => setCustomCategory(e.target.value)}
               placeholder="Masukkan kategori custom"
-              className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500"
             />
           )}
         </div>
@@ -94,7 +94,7 @@ export default function MobileAddExpense({
             type="date"
             value={formData.date}
             onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -105,7 +105,7 @@ export default function MobileAddExpense({
             onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
             placeholder="Masukkan deskripsi pengeluaran (opsional)"
             rows={4}
-            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+            className="w-full bg-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
 
@@ -113,7 +113,7 @@ export default function MobileAddExpense({
           <label className="text-sm text-gray-400 mb-3 block">Upload Struk (Opsional)</label>
           <div className="bg-gray-700 rounded-xl p-4 text-center border-2 border-dashed border-gray-600">
             <input type="file" id="receipt" accept="image/*" className="hidden" onChange={onFileChange} />
-            <label htmlFor="receipt" className="text-purple-400 cursor-pointer hover:text-purple-300">
+            <label htmlFor="receipt" className="text-orange-400 cursor-pointer hover:text-orange-300">
               Pilih File
             </label>
             <span className="text-gray-500 ml-2">{receipt ? receipt.name : "Tidak ada file"}</span>
@@ -132,7 +132,7 @@ export default function MobileAddExpense({
             onClick={onSubmit}
             type="button"
             disabled={submitting || uploading}
-            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 rounded-2xl py-4 font-bold text-white hover:from-purple-700 hover:to-pink-600 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 bg-blue-600 rounded-2xl py-4 font-bold text-white hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting || uploading ? "Menyimpan..." : "Simpan Pengeluaran"}
           </button>

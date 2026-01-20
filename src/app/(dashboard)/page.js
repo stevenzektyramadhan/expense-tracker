@@ -184,7 +184,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <Link href="/add" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+          <Link href="/add" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
             Tambah Pengeluaran
           </Link>
         </div>
@@ -195,7 +195,7 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold text-gray-700">Sisa Uang Saku Bulan Ini</h2>
             <p className="mt-2 text-2xl font-bold text-gray-900">Rp {allowance.remaining.toLocaleString()}</p>
             <p className="text-sm text-gray-500">Dari Rp {allowance.amount.toLocaleString()}</p>
-            <button className="mt-3 text-sm bg-indigo-600 text-white px-3 py-1 rounded-md hover:bg-indigo-700" onClick={() => setOpen(true)}>
+            <button className="mt-3 text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700" onClick={() => setOpen(true)}>
               Atur
             </button>
           </div>

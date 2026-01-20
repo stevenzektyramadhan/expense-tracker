@@ -69,6 +69,22 @@ export async function POST(req) {
     const newRemaining = currentRemaining - roundedAmount;
 
     // =========================================================================
+    // STEP 3.5: BALANCE VALIDATION - Prevent negative balance
+    // =========================================================================
+    // Check if the user has sufficient balance before allowing the expense
+    // This prevents overspending beyond the allocated monthly allowance
+    if (newRemaining < 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Saldo tidak cukup! Hemat pangkal kaya.",
+          currentBalance: currentRemaining,
+          requestedAmount: roundedAmount 
+        }),
+        { status: 400 }
+      );
+    }
+
+    // =========================================================================
     // STEP 4: Use a TRANSACTION for atomic operations
     // =========================================================================
     // prisma.$transaction() ensures that ALL operations inside either:

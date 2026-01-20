@@ -28,7 +28,7 @@ const CustomTooltip = ({ active, payload }) => {
     return (
       <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg border border-gray-700">
         <p className="font-semibold">{name}</p>
-        <p className="text-purple-300">Rp {formatCurrency(value)}</p>
+        <p className="text-orange-300">Rp {formatCurrency(value)}</p>
         <p className="text-xs text-gray-300">{(percent * 100).toFixed(1)}%</p>
       </div>
     );
@@ -85,7 +85,7 @@ export default function MobileSummary({ monthlyData = [], selectedMonth, onMonth
           <div className="border-t border-gray-700 pt-4">
             <div className="flex justify-between items-center">
               <span className="font-bold text-white">Total:</span>
-              <span className="font-bold text-purple-400 text-xl">Rp {formatCurrency(currentMonthData.total)}</span>
+              <span className="font-bold text-orange-400 text-xl">Rp {formatCurrency(currentMonthData.total)}</span>
             </div>
           </div>
 

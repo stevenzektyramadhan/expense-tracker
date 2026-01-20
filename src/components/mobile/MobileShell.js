@@ -59,12 +59,13 @@ export default function MobileShell({ children }) {
       */}
       <header className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-          <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Expense Tracker
+          <h1 className="text-lg font-bold">
+            <span className="text-orange-500">kite</span>
+            <span className="text-blue-500">Catat</span>
           </h1>
           <button
             onClick={handleLogout}
-            className="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+            className="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-red-400"
             aria-label="Logout"
           >
             <LogOut className="w-5 h-5" />
@@ -107,7 +108,7 @@ export default function MobileShell({ children }) {
       */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden z-50">
         <div 
-          className="bg-gradient-to-r from-purple-600 to-pink-500 rounded-t-3xl shadow-lg"
+          className="bg-gradient-to-r from-blue-600 to-orange-500 rounded-t-3xl shadow-lg"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           <div className="flex justify-around items-center max-w-md mx-auto p-4">
@@ -117,7 +118,7 @@ export default function MobileShell({ children }) {
                 <Link 
                   key={href} 
                   href={href} 
-                  className={`flex flex-col items-center transition ${isActive ? "text-white" : "text-purple-200 hover:text-white"}`} 
+                  className={`flex flex-col items-center transition ${isActive ? "text-white" : "text-blue-200 hover:text-white"}`} 
                   aria-current={isActive ? "page" : undefined}
                 >
                   <Icon className="w-7 h-7 mb-1" />

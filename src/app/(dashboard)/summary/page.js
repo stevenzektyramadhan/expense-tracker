@@ -246,7 +246,7 @@ export default function SummaryPage() {
           <div className="text-gray-400 text-6xl mb-4">📊</div>
           <h3 className="text-lg font-medium text-white mb-2">Belum ada data pengeluaran</h3>
           <p className="text-gray-400 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
-          <button onClick={() => router.push("/add")} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg">
+          <button onClick={() => router.push("/add")} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
             Tambah Pengeluaran
           </button>
         </div>

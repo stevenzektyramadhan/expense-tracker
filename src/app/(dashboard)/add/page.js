@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatRupiah, parseRupiah } from "@/lib/utils";
 import CategorySelect from "../components/CategorySelect";
 import Swal from "sweetalert2";
+import toast from "react-hot-toast";
 import MobileAddExpense from "@/components/mobile/MobileAddExpense";
 
 export default function AddExpensePage() {
@@ -98,7 +99,17 @@ export default function AddExpensePage() {
     setSubmitting(true);
 
     if (formData.amount === "" || formData.category === "" || formData.date === "") {
-      await Swal.fire("Form Belum Lengkap", "Mohon lengkapi semua field wajib.", "warning");
+      toast.error("Mohon lengkapi semua field wajib.", {
+        style: {
+          background: '#1F2937',
+          color: '#FFFFFF',
+          border: '1px solid #374151',
+        },
+        iconTheme: {
+          primary: '#EF4444',
+          secondary: '#FFFFFF',
+        },
+      });
       setSubmitting(false);
       return;
     }
@@ -110,7 +121,17 @@ export default function AddExpensePage() {
     if (receipt) {
       receiptUrl = await uploadReceipt();
       if (!receiptUrl) {
-        await Swal.fire("Gagal Upload", "Struk gagal diupload. Coba lagi.", "error");
+        toast.error("Struk gagal diupload. Coba lagi.", {
+          style: {
+            background: '#1F2937',
+            color: '#FFFFFF',
+            border: '1px solid #374151',
+          },
+          iconTheme: {
+            primary: '#EF4444',
+            secondary: '#FFFFFF',
+          },
+        });
         setSubmitting(false);
         return;
       }
@@ -142,18 +163,32 @@ export default function AddExpensePage() {
       }
 
       // ✅ Sukses! Transaksi expense + allowance sudah ditangani API
-      await Swal.fire({
-        icon: "success",
-        title: "Berhasil!",
-        text: "Pengeluaran berhasil ditambahkan & uang saku diperbarui!",
-        timer: 1500,
-        showConfirmButton: false,
+      toast.success("Pengeluaran berhasil disimpan!", {
+        style: {
+          background: '#1F2937',
+          color: '#FFFFFF',
+          border: '1px solid #374151',
+        },
+        iconTheme: {
+          primary: '#10B981',
+          secondary: '#FFFFFF',
+        },
       });
 
       router.push("/");
     } catch (err) {
       console.error("Error saving expense:", err.message);
-      await Swal.fire("Error", err.message || "Gagal menyimpan pengeluaran. Silakan coba lagi.", "error");
+      toast.error(err.message || "Gagal menyimpan pengeluaran.", {
+        style: {
+          background: '#1F2937',
+          color: '#FFFFFF',
+          border: '1px solid #374151',
+        },
+        iconTheme: {
+          primary: '#EF4444',
+          secondary: '#FFFFFF',
+        },
+      });
     } finally {
       setSubmitting(false);
     }
