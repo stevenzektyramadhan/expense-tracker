@@ -3,9 +3,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Search } from "./icons";
+import { Pencil } from "lucide-react";
 import MobileShell from "./MobileShell";
 import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+
+// =============================================================================
+// PERIOD-BASED EXPENSE FILTERING HELPER
+// =============================================================================
+const getExpensesForPeriod = (expenses, frequency) => {
+  const now = new Date();
+  let periodStart, periodEnd;
+  
+  if (frequency === "weekly") {
+    periodStart = startOfWeek(now, { weekStartsOn: 1 });
+    periodEnd = endOfWeek(now, { weekStartsOn: 1 });
+  } else {
+    periodStart = startOfMonth(now);
+    periodEnd = endOfMonth(now);
+  }
+  
+  return expenses.filter((expense) => {
+    const expenseDate = new Date(expense.date);
+    return isWithinInterval(expenseDate, { start: periodStart, end: periodEnd });
+  });
+};
 
 const formatCurrency = (amount = 0) => new Intl.NumberFormat("id-ID").format(amount);
 
@@ -31,7 +54,7 @@ const getCategoryColor = (category) => {
   return colors[category] || "bg-gray-500";
 };
 
-export default function MobileDashboard({ user, expenses = [], allowance, onSelectExpense = () => {} }) {
+export default function MobileDashboard({ user, expenses = [], allowance, onSelectExpense = () => {}, onEditBudget = () => {} }) {
   const router = useRouter();
   const [filterMonth, setFilterMonth] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -140,22 +163,24 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
     return filtered;
   }, [expenses, filterCategory, filterMonth, searchDesc, sortOrder]);
 
-  const currentMonthLabel = useMemo(
-    () => new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" }),
-    []
+  // Get the current budget frequency (default to 'monthly')
+  const currentFrequency = allowance?.frequency || "monthly";
+
+  // Calculate total expenses for the current period (week or month)
+  const periodExpenses = useMemo(
+    () => getExpensesForPeriod(expenses, currentFrequency),
+    [expenses, currentFrequency]
   );
 
   const totalExpense = useMemo(
-    () =>
-      expenses
-        .filter((e) => getMonthName(e.date) === currentMonthLabel)
-        .reduce((sum, e) => sum + (e.amount || 0), 0),
-    [currentMonthLabel, expenses]
+    () => periodExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+    [periodExpenses]
   );
 
-  const avgPerTransaction = filteredExpenses.length > 0 ? totalExpense / filteredExpenses.length : 0;
-  const monthlyBudget = allowance?.amount || 0;
-  const remainingBudget = allowance?.remaining ?? monthlyBudget - totalExpense;
+  // Calculate average using period-filtered expenses (not user search filter)
+  const avgPerTransaction = periodExpenses.length > 0 ? totalExpense / periodExpenses.length : 0;
+  const budget = allowance?.amount || 0;
+  const remainingBudget = allowance?.remaining ?? budget - totalExpense;
 
   return (
     <MobileShell>
@@ -181,8 +206,27 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-orange-500 flex-shrink-0" aria-hidden />
         </div>
 
-        <div className="bg-gradient-to-r from-blue-600 to-orange-500 rounded-3xl p-6 mb-4">
-          <p className="text-white text-sm mb-2 opacity-90">Balance</p>
+
+        {/* ===================================================================
+            BALANCE CARD WITH EDIT BUTTON
+            ===================================================================
+            The main gradient card showing remaining budget. Includes a subtle
+            edit button (Pencil icon) at top-right corner to allow users to
+            update their monthly budget without searching for the option.
+        */}
+        <div className="bg-gradient-to-r from-blue-600 to-orange-500 rounded-3xl p-6 mb-4 relative">
+          {/* Edit Budget Button - Top Right Corner 
+              z-20 relative ensures the button is clickable above the gradient background */}
+          <button
+            onClick={onEditBudget}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors z-20"
+            aria-label="Edit Budget"
+          >
+            <Pencil className="w-4 h-4 text-white" />
+          </button>
+          <p className="text-white text-sm mb-2 opacity-90">
+            Balance {currentFrequency === 'weekly' ? '(Mingguan)' : '(Bulanan)'}
+          </p>
           <h2 className="text-4xl font-bold text-white">Rp {formatCurrency(remainingBudget)}</h2>
         </div>
 
@@ -194,7 +238,7 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-blue-600 rounded-2xl p-4">
             <p className="text-white text-xs mb-1 opacity-90">Total Transaksi</p>
-            <p className="text-2xl font-bold text-white">{expenses.length}</p>
+            <p className="text-2xl font-bold text-white">{periodExpenses.length}</p>
           </div>
           <div className="bg-orange-500 rounded-2xl p-4">
             <p className="text-white text-xs mb-1 opacity-90">Rata-rata Transaksi</p>
