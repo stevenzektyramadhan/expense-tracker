@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { getExpenses, supabase } from "@/lib/supabaseClient";
 import Swal from "sweetalert2";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
 // Components
 import SummaryCards from "./components/SummaryCards";
@@ -15,6 +16,47 @@ import DashboardFilters from "./components/DashboardFilters";
 import AllowanceModal from "./components/AllowanceModal";
 import MobileDashboard from "@/components/mobile/MobileDashboard";
 import MobileExpenseDetailSheet from "@/components/mobile/MobileExpenseDetailSheet";
+
+// =============================================================================
+// PERIOD-BASED EXPENSE FILTERING HELPER
+// =============================================================================
+/**
+ * Filters expenses based on the current period (week or month).
+ * Uses date-fns for robust date calculations.
+ * 
+ * @param {Array} expenses - Array of expense objects with 'date' field
+ * @param {string} frequency - 'weekly' or 'monthly'
+ * @returns {Array} - Filtered expenses within the current period
+ */
+const getExpensesForPeriod = (expenses, frequency) => {
+  const now = new Date();
+  
+  let periodStart, periodEnd;
+  
+  if (frequency === "weekly") {
+    // Week starts on Monday (weekStartsOn: 1)
+    periodStart = startOfWeek(now, { weekStartsOn: 1 });
+    periodEnd = endOfWeek(now, { weekStartsOn: 1 });
+  } else {
+    // Default to monthly
+    periodStart = startOfMonth(now);
+    periodEnd = endOfMonth(now);
+  }
+  
+  return expenses.filter((expense) => {
+    const expenseDate = new Date(expense.date);
+    return isWithinInterval(expenseDate, { start: periodStart, end: periodEnd });
+  });
+};
+
+/**
+ * Returns the appropriate label for the current period.
+ * @param {string} frequency - 'weekly' or 'monthly'
+ * @returns {string} - "Minggu Ini" or "Bulan Ini"
+ */
+const getPeriodLabel = (frequency) => {
+  return frequency === "weekly" ? "Minggu Ini" : "Bulan Ini";
+};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -139,6 +181,20 @@ export default function DashboardPage() {
     setExpenses(expenses.map((e) => (e.id === id ? { ...e, ...updatedData } : e)));
   };
 
+  // Get current frequency from allowance (default to 'monthly')
+  const currentFrequency = allowance?.frequency || "monthly";
+  const periodLabel = getPeriodLabel(currentFrequency);
+
+  // Calculate total expenses for the current period
+  const periodExpenses = useMemo(
+    () => getExpensesForPeriod(expenses, currentFrequency),
+    [expenses, currentFrequency]
+  );
+  const totalPeriodExpenses = useMemo(
+    () => periodExpenses.reduce((sum, e) => sum + e.amount, 0),
+    [periodExpenses]
+  );
+
   if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
 
   const getFilteredExpenses = () => {
@@ -178,6 +234,7 @@ export default function DashboardPage() {
     return filtered;
   };
   const totalExpenses = getFilteredExpenses().reduce((sum, e) => sum + e.amount, 0);
+  
   return (
     <>
       <div className="hidden md:block space-y-6">
@@ -189,12 +246,19 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* 🔹 Tambahin Allowance Info */}
+        {/* 🔹 Allowance Info - Dynamic Label Based on Frequency */}
         {allowance && (
           <div className="bg-white p-6 shadow rounded-lg">
-            <h2 className="text-lg font-semibold text-gray-700">Sisa Uang Saku Bulan Ini</h2>
+            <h2 className="text-lg font-semibold text-gray-700">
+              Sisa Uang Saku {periodLabel}
+            </h2>
             <p className="mt-2 text-2xl font-bold text-gray-900">Rp {allowance.remaining.toLocaleString()}</p>
-            <p className="text-sm text-gray-500">Dari Rp {allowance.amount.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">
+              Dari Rp {allowance.amount.toLocaleString()} ({currentFrequency === "weekly" ? "Mingguan" : "Bulanan"})
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              Total Pengeluaran {periodLabel}: Rp {totalPeriodExpenses.toLocaleString()}
+            </p>
             <button className="mt-3 text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700" onClick={() => setOpen(true)}>
               Atur
             </button>
@@ -238,6 +302,7 @@ export default function DashboardPage() {
           expenses={expenses}
           allowance={allowance}
           onSelectExpense={setSelectedExpense}
+          onEditBudget={() => setOpen(true)}
         />
       </div>
 
@@ -277,6 +342,8 @@ export default function DashboardPage() {
           loadAllowance?.(); // refresh data di parent
         }}
         userId={user?.id}
+        initialAmount={allowance?.amount || 0}
+        initialFrequency={allowance?.frequency || "monthly"}
       />
     </>
   );
