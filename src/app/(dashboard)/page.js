@@ -166,19 +166,30 @@ export default function DashboardPage() {
 
     if (!result.isConfirmed) return;
 
-    const { error } = await supabase.from("expenses").delete().eq("id", id);
-    if (!error) {
+    const response = await fetch("/api/expenses", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    if (response.ok) {
       setExpenses(expenses.filter((e) => e.id !== id));
       setSelectedExpense(null);
+      loadAllowance();
 
       Swal.fire("Terhapus!", "Pengeluaran berhasil dihapus.", "success");
     } else {
+      const payload = await response.json().catch(() => ({}));
       Swal.fire("Gagal!", "Gagal menghapus pengeluaran.", "error");
+      console.error("Failed deleting expense", payload);
     }
   };
 
-  const handleUpdate = (id, updatedData) => {
-    setExpenses(expenses.map((e) => (e.id === id ? { ...e, ...updatedData } : e)));
+  const handleUpdate = (updatedExpense) => {
+    setExpenses(expenses.map((e) => (e.id === updatedExpense.id ? updatedExpense : e)));
+    loadAllowance();
   };
 
   // Get current frequency from allowance (default to 'monthly')

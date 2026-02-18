@@ -146,7 +146,6 @@ export default function AddExpensePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_id: user.id,
           amount: parseFloat(formData.amount),
           category: selectedCategory === "Lainnya" ? customCategory || "Lainnya" : selectedCategory,
           date: formData.date,

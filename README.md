@@ -156,3 +156,44 @@ Tabel utama: **expenses**
 - ✅ **Row Level Security** di Supabase → aman untuk multi-user
 
 ---
+
+## 🔐 Security Hardening (Phase 1)
+
+Mulai fase ini, endpoint API internal menggunakan model **session-only**:
+
+- Endpoint tidak lagi mempercayai `user_id` dari body/query.
+- User diambil dari session cookie Supabase di server.
+- Jika session tidak valid, API mengembalikan `401 Unauthorized`.
+
+### Endpoint yang di-hardening
+
+- `POST /api/expenses`
+- `GET /api/expenses`
+- `GET /api/summary`
+- `POST /api/allowances`
+- `GET /api/allowances`
+- `POST /api/upload`
+- `DELETE /api/upload`
+
+### Validasi upload
+
+- Hanya menerima file bertipe image (`image/*`)
+- Maksimal ukuran file: **5MB**
+
+### Dampak ke frontend
+
+- Frontend tidak perlu (dan tidak boleh mengandalkan) `user_id` untuk endpoint di atas.
+- Contoh: request ringkasan menjadi `GET /api/summary` tanpa query `user_id`.
+
+## ⚖️ Data Consistency (Phase 2)
+
+Fase ini memastikan `allowances.remaining` tetap sinkron saat pengeluaran diubah atau dihapus.
+
+- `PUT /api/expenses` sekarang mengubah expense **dan** menyesuaikan `allowances.remaining` dalam satu transaksi database.
+- `DELETE /api/expenses` sekarang menghapus expense **dan** mengembalikan nominal ke `allowances.remaining` dalam satu transaksi database.
+- Operasi update/delete expense dari UI dashboard sudah dipindahkan ke API ini (tidak lagi update/delete langsung dari client ke tabel `expenses`).
+
+### Aturan saldo
+
+- Update nominal expense yang membuat saldo jadi negatif akan ditolak (`400`).
+- Saat pengembalian saldo (mis. delete), nilai `remaining` di-clamp agar tidak melebihi nilai `amount` allowance.

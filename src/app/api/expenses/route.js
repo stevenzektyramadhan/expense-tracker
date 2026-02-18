@@ -7,6 +7,13 @@
 
 // Import our Prisma singleton - this ensures we reuse the same database connection
 import prisma from "@/lib/prisma";
+import { requireAuthenticatedUser } from "@/lib/supabaseServer";
+
+const clampRemainingBalance = (value, allowanceAmount) => {
+  if (value < 0) return 0;
+  if (value > allowanceAmount) return allowanceAmount;
+  return value;
+};
 
 // =============================================================================
 // POST /api/expenses - Create a new expense and deduct from allowance
@@ -18,8 +25,23 @@ import prisma from "@/lib/prisma";
 // =============================================================================
 export async function POST(req) {
   try {
+    const { user, errorResponse } = await requireAuthenticatedUser();
+    if (errorResponse) return errorResponse;
+
     // Parse the JSON body from the request
-    const { user_id, amount, description, category, date, receipt_url } = await req.json();
+    const { amount, description, category, date, receipt_url } = await req.json();
+
+    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
+      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
+        status: 400,
+      });
+    }
+
+    if (!category || !date) {
+      return new Response(JSON.stringify({ error: "category and date are required" }), {
+        status: 400,
+      });
+    }
 
     // Get current month and year for finding the active allowance
     const now = new Date();
@@ -35,7 +57,7 @@ export async function POST(req) {
     // 3. Get the current remaining balance for calculation
     const allowance = await prisma.allowances.findFirst({
       where: {
-        user_id: user_id,
+        user_id: user.id,
         month: month,
         year: year,
       },
@@ -98,7 +120,7 @@ export async function POST(req) {
       // this operation is part of the transaction
       const newExpense = await tx.expenses.create({
         data: {
-          user_id: user_id,
+          user_id: user.id,
           amount: roundedAmount,       // Using rounded integer value
           description: description,
           category: category,
@@ -143,18 +165,8 @@ export async function POST(req) {
 // Returns all expenses for the user, ordered by date descending (newest first)
 export async function GET(req) {
   try {
-    // Extract user_id from URL query parameters
-    // Example: /api/expenses?user_id=abc-123
-    const { searchParams } = new URL(req.url);
-    const user_id = searchParams.get("user_id");
-
-    // Validate that user_id was provided
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "user_id is required" }),
-        { status: 400 }
-      );
-    }
+    const { user, errorResponse } = await requireAuthenticatedUser();
+    if (errorResponse) return errorResponse;
 
     // =========================================================================
     // Fetch all expenses for the user
@@ -163,7 +175,7 @@ export async function GET(req) {
     // orderBy specifies the sort order - newest expenses first
     const expenses = await prisma.expenses.findMany({
       where: {
-        user_id: user_id,
+        user_id: user.id,
       },
       orderBy: {
         date: "desc",  // Sort by date descending (newest first)
@@ -175,6 +187,179 @@ export async function GET(req) {
     return new Response(JSON.stringify(expenses), { status: 200 });
   } catch (err) {
     console.error("Expenses GET error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+
+// =============================================================================
+// PUT /api/expenses - Update an existing expense and re-sync allowance
+// =============================================================================
+// Request body: { id, amount, category, date, description }
+// Rules:
+// - Expense must belong to authenticated user
+// - If expense is linked to an allowance, update allowance.remaining by delta
+// - Reject if updated amount would make balance negative
+export async function PUT(req) {
+  try {
+    const { user, errorResponse } = await requireAuthenticatedUser();
+    if (errorResponse) return errorResponse;
+
+    const { id, amount, category, date, description } = await req.json();
+
+    if (!id || typeof id !== "string") {
+      return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
+    }
+
+    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
+      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
+        status: 400,
+      });
+    }
+
+    if (!category || !date) {
+      return new Response(JSON.stringify({ error: "category and date are required" }), {
+        status: 400,
+      });
+    }
+
+    const roundedAmount = Math.round(amount);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existingExpense = await tx.expenses.findFirst({
+        where: {
+          id,
+          user_id: user.id,
+        },
+      });
+
+      if (!existingExpense) {
+        return {
+          status: 404,
+          payload: { error: "Expense not found" },
+        };
+      }
+
+      if (existingExpense.allowance_id) {
+        const allowance = await tx.allowances.findUnique({
+          where: { id: existingExpense.allowance_id },
+        });
+
+        if (allowance) {
+          const currentRemaining = Number(allowance.remaining);
+          const allowanceAmount = Number(allowance.amount);
+          const delta = roundedAmount - existingExpense.amount;
+          const proposedRemaining = currentRemaining - delta;
+
+          if (proposedRemaining < 0) {
+            return {
+              status: 400,
+              payload: {
+                error: "Saldo tidak cukup! Hemat pangkal kaya.",
+                currentBalance: currentRemaining,
+                requestedDelta: delta,
+              },
+            };
+          }
+
+          await tx.allowances.update({
+            where: { id: allowance.id },
+            data: {
+              remaining: clampRemainingBalance(proposedRemaining, allowanceAmount),
+              updated_at: new Date(),
+            },
+          });
+        }
+      }
+
+      const updatedExpense = await tx.expenses.update({
+        where: { id: existingExpense.id },
+        data: {
+          amount: roundedAmount,
+          category,
+          date: new Date(date),
+          description,
+        },
+      });
+
+      return {
+        status: 200,
+        payload: updatedExpense,
+      };
+    });
+
+    return new Response(JSON.stringify(result.payload), { status: result.status });
+  } catch (err) {
+    console.error("Expenses PUT error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+
+// =============================================================================
+// DELETE /api/expenses - Delete expense and refund allowance balance
+// =============================================================================
+// Request body: { id }
+// Rules:
+// - Expense must belong to authenticated user
+// - If linked to an allowance, add amount back to allowance.remaining
+export async function DELETE(req) {
+  try {
+    const { user, errorResponse } = await requireAuthenticatedUser();
+    if (errorResponse) return errorResponse;
+
+    const { id } = await req.json();
+
+    if (!id || typeof id !== "string") {
+      return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existingExpense = await tx.expenses.findFirst({
+        where: {
+          id,
+          user_id: user.id,
+        },
+      });
+
+      if (!existingExpense) {
+        return {
+          status: 404,
+          payload: { error: "Expense not found" },
+        };
+      }
+
+      if (existingExpense.allowance_id) {
+        const allowance = await tx.allowances.findUnique({
+          where: { id: existingExpense.allowance_id },
+        });
+
+        if (allowance) {
+          const currentRemaining = Number(allowance.remaining);
+          const allowanceAmount = Number(allowance.amount);
+          const refundedRemaining = currentRemaining + existingExpense.amount;
+
+          await tx.allowances.update({
+            where: { id: allowance.id },
+            data: {
+              remaining: clampRemainingBalance(refundedRemaining, allowanceAmount),
+              updated_at: new Date(),
+            },
+          });
+        }
+      }
+
+      await tx.expenses.delete({
+        where: { id: existingExpense.id },
+      });
+
+      return {
+        status: 200,
+        payload: { success: true },
+      };
+    });
+
+    return new Response(JSON.stringify(result.payload), { status: result.status });
+  } catch (err) {
+    console.error("Expenses DELETE error:", err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }

@@ -59,7 +59,7 @@ export default function SummaryPage() {
       setLoadingData(true);
 
       // ✅ Fetch pre-aggregated data from API
-      const response = await fetch(`/api/summary?user_id=${user.id}`);
+      const response = await fetch("/api/summary");
       
       if (!response.ok) {
         const errorData = await response.json();

@@ -7,16 +7,25 @@
 
 // Import our Prisma singleton - this ensures we reuse the same database connection
 import prisma from "@/lib/prisma";
+import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 // =============================================================================
 // POST /api/allowances - Create or return existing allowance for current month
 // =============================================================================
 export async function POST(req) {
   try {
+    const { user, errorResponse } = await requireAuthenticatedUser();
+    if (errorResponse) return errorResponse;
+
     // Parse the JSON body from the request
-    // user_id: The authenticated user's UUID
     // amount: The budget amount for the month (Decimal in database)
-    const { user_id, amount } = await req.json();
+    const { amount } = await req.json();
+
+    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
+      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
+        status: 400,
+      });
+    }
 
     // Get current month and year to find or create the correct allowance
     const now = new Date();
@@ -31,7 +40,7 @@ export async function POST(req) {
     // The 'where' clause specifies our filter conditions
     const existing = await prisma.allowances.findFirst({
       where: {
-        user_id: user_id,  // Match the user
+        user_id: user.id,  // Match the user
         month: month,       // Match the month
         year: year,         // Match the year
       },
@@ -59,7 +68,7 @@ export async function POST(req) {
     // Prisma automatically handles the conversion from number to Decimal
     const newAllowance = await prisma.allowances.create({
       data: {
-        user_id: user_id,
+        user_id: user.id,
         month: month,
         year: year,
         amount: amount,           // Initial budget amount
@@ -92,20 +101,10 @@ export async function POST(req) {
 // =============================================================================
 // Query params: user_id (required)
 // Returns the allowance for the current month, or null if none exists
-export async function GET(req) {
+export async function GET() {
   try {
-    // Extract user_id from URL query parameters
-    // Example: /api/allowances?user_id=abc-123
-    const { searchParams } = new URL(req.url);
-    const user_id = searchParams.get("user_id");
-
-    // Validate that user_id was provided
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "user_id is required" }),
-        { status: 400 }
-      );
-    }
+    const { user, errorResponse } = await requireAuthenticatedUser();
+    if (errorResponse) return errorResponse;
 
     // Get current month and year
     const now = new Date();
@@ -116,7 +115,7 @@ export async function GET(req) {
     // findFirst returns null if no record is found (no error thrown)
     const allowance = await prisma.allowances.findFirst({
       where: {
-        user_id: user_id,
+        user_id: user.id,
         month: month,
         year: year,
       },
