@@ -35,9 +35,9 @@ import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 // Query params: user_id (required)
 // Returns pre-computed summary data for charts and statistics
 // =============================================================================
-export async function GET() {
+export async function GET(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     // =========================================================================

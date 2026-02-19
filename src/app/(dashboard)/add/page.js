@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { formatRupiah, parseRupiah } from "@/lib/utils";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import CategorySelect from "../components/CategorySelect";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
@@ -76,7 +77,7 @@ export default function AddExpensePage() {
       const formDataUpload = new FormData();
       formDataUpload.append("file", receipt);
 
-      const response = await fetch("/api/upload", {
+      const response = await authenticatedFetch("/api/upload", {
         method: "POST",
         body: formDataUpload,
       });
@@ -140,7 +141,7 @@ export default function AddExpensePage() {
     try {
       // ✅ Kirim data ke API /api/expenses
       // API sudah menangani insert expense + update allowance dalam satu transaksi
-      const response = await fetch("/api/expenses", {
+      const response = await authenticatedFetch("/api/expenses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -13,7 +13,7 @@ cloudinary.config({
 
 export async function POST(request) {
   try {
-    const { errorResponse } = await requireAuthenticatedUser();
+    const { errorResponse } = await requireAuthenticatedUser(request);
     if (errorResponse) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -75,7 +75,7 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
-    const { errorResponse } = await requireAuthenticatedUser();
+    const { errorResponse } = await requireAuthenticatedUser(request);
     if (errorResponse) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

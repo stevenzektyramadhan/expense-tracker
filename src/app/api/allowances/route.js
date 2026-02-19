@@ -14,7 +14,7 @@ import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 // =============================================================================
 export async function POST(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     // Parse the JSON body from the request
@@ -101,9 +101,9 @@ export async function POST(req) {
 // =============================================================================
 // Query params: user_id (required)
 // Returns the allowance for the current month, or null if none exists
-export async function GET() {
+export async function GET(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     // Get current month and year

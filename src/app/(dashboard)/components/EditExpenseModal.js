@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatDateForInput } from "@/lib/utils";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import CategorySelect from "./CategorySelect";
 
 export default function EditExpenseModal({ expense, onClose, onUpdate }) {
@@ -24,7 +25,7 @@ export default function EditExpenseModal({ expense, onClose, onUpdate }) {
     };
 
     try {
-      const response = await fetch("/api/expenses", {
+      const response = await authenticatedFetch("/api/expenses", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

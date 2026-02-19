@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import MobileSummary from "@/components/mobile/MobileSummary";
 
@@ -59,7 +60,7 @@ export default function SummaryPage() {
       setLoadingData(true);
 
       // ✅ Fetch pre-aggregated data from API
-      const response = await fetch("/api/summary");
+      const response = await authenticatedFetch("/api/summary");
       
       if (!response.ok) {
         const errorData = await response.json();

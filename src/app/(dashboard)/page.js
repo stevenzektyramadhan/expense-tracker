@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { getExpenses, supabase } from "@/lib/supabaseClient";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import Swal from "sweetalert2";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
@@ -166,7 +167,7 @@ export default function DashboardPage() {
 
     if (!result.isConfirmed) return;
 
-    const response = await fetch("/api/expenses", {
+    const response = await authenticatedFetch("/api/expenses", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",

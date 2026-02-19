@@ -25,7 +25,7 @@ const clampRemainingBalance = (value, allowanceAmount) => {
 // =============================================================================
 export async function POST(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     // Parse the JSON body from the request
@@ -165,7 +165,7 @@ export async function POST(req) {
 // Returns all expenses for the user, ordered by date descending (newest first)
 export async function GET(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     // =========================================================================
@@ -201,7 +201,7 @@ export async function GET(req) {
 // - Reject if updated amount would make balance negative
 export async function PUT(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     const { id, amount, category, date, description } = await req.json();
@@ -303,7 +303,7 @@ export async function PUT(req) {
 // - If linked to an allowance, add amount back to allowance.remaining
 export async function DELETE(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser();
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
     const { id } = await req.json();
