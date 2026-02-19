@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
+import { requireAuthenticatedUser } from "@/lib/supabaseServer";
+
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
 // Configure Cloudinary
 cloudinary.config({
@@ -10,11 +13,28 @@ cloudinary.config({
 
 export async function POST(request) {
   try {
+    const { errorResponse } = await requireAuthenticatedUser(request);
+    if (errorResponse) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    if (typeof file.arrayBuffer !== "function") {
+      return NextResponse.json({ error: "Invalid file payload" }, { status: 400 });
+    }
+
+    if (!file.type?.startsWith("image/")) {
+      return NextResponse.json({ error: "Only image uploads are allowed" }, { status: 400 });
+    }
+
+    if (typeof file.size === "number" && file.size > MAX_UPLOAD_SIZE_BYTES) {
+      return NextResponse.json({ error: "File size exceeds 5MB" }, { status: 400 });
     }
 
     // Convert file to buffer
@@ -55,9 +75,14 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
+    const { errorResponse } = await requireAuthenticatedUser(request);
+    if (errorResponse) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { public_id } = await request.json();
 
-    if (!public_id) {
+    if (!public_id || typeof public_id !== "string") {
       return NextResponse.json({ error: "No public_id provided" }, { status: 400 });
     }
 

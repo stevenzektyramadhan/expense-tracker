@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { formatDateForInput } from "@/lib/utils";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import CategorySelect from "./CategorySelect";
 
 export default function EditExpenseModal({ expense, onClose, onUpdate }) {
@@ -14,8 +14,6 @@ export default function EditExpenseModal({ expense, onClose, onUpdate }) {
     e.preventDefault();
     setLoading(true);
 
-    const formData = new FormData(e.target);
-
     // kalau pilih Lainnya + isi kategori custom
     const categoryToSave = selectedCategory === "Lainnya" && customCategory.trim() !== "" ? customCategory.trim() : selectedCategory;
 
@@ -26,15 +24,30 @@ export default function EditExpenseModal({ expense, onClose, onUpdate }) {
       description: e.target.description.value,
     };
 
-    const { error } = await supabase.from("expenses").update(updatedData).eq("id", expense.id);
+    try {
+      const response = await authenticatedFetch("/api/expenses", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: expense.id,
+          ...updatedData,
+        }),
+      });
 
-    setLoading(false);
+      const payload = await response.json();
 
-    if (!error) {
-      onUpdate(expense.id, updatedData);
+      if (!response.ok) {
+        throw new Error(payload.error || "Gagal update pengeluaran");
+      }
+
+      onUpdate(payload);
       onClose();
-    } else {
+    } catch (error) {
       alert("Gagal update: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 

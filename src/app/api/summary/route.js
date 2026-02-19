@@ -27,6 +27,7 @@
 // =============================================================================
 
 import prisma from "@/lib/prisma";
+import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 // =============================================================================
 // GET /api/summary - Get aggregated expense summary
@@ -36,17 +37,8 @@ import prisma from "@/lib/prisma";
 // =============================================================================
 export async function GET(req) {
   try {
-    // Extract user_id from URL query parameters
-    const { searchParams } = new URL(req.url);
-    const user_id = searchParams.get("user_id");
-
-    // Validate that user_id was provided
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "user_id is required" }),
-        { status: 400 }
-      );
-    }
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    if (errorResponse) return errorResponse;
 
     // =========================================================================
     // QUERY 1: Total expense (all time) using aggregate
@@ -58,7 +50,7 @@ export async function GET(req) {
     // Since amount is an Integer in the database, result is also Integer
     const totalResult = await prisma.expenses.aggregate({
       where: {
-        user_id: user_id,
+        user_id: user.id,
       },
       _sum: {
         amount: true,  // Sum all expense amounts
@@ -78,7 +70,7 @@ export async function GET(req) {
     const expensesByCategory = await prisma.expenses.groupBy({
       by: ["category"],  // Group by category field
       where: {
-        user_id: user_id,
+        user_id: user.id,
       },
       _sum: {
         amount: true,    // Sum amount for each category
@@ -108,7 +100,7 @@ export async function GET(req) {
         SUM(amount)::int as total,
         COUNT(id)::int as transaction_count
       FROM expenses
-      WHERE user_id = ${user_id}
+      WHERE user_id = ${user.id}
       GROUP BY EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date)
       ORDER BY year DESC, month DESC
     `;
@@ -152,7 +144,7 @@ export async function GET(req) {
         category,
         SUM(amount)::int as total
       FROM expenses
-      WHERE user_id = ${user_id}
+      WHERE user_id = ${user.id}
       GROUP BY EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date), category
       ORDER BY year DESC, month DESC, total DESC
     `;
