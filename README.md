@@ -197,3 +197,31 @@ Fase ini memastikan `allowances.remaining` tetap sinkron saat pengeluaran diubah
 
 - Update nominal expense yang membuat saldo jadi negatif akan ditolak (`400`).
 - Saat pengembalian saldo (mis. delete), nilai `remaining` di-clamp agar tidak melebihi nilai `amount` allowance.
+
+## ⚡ Performance (Vercel Free Tier)
+
+Optimasi ini fokus ke pengurangan JavaScript client dan kerja ulang render agar cocok untuk limit resource di Vercel gratis.
+
+### Poin 1 - Root Layout diringankan
+
+- `src/app/layout.js` diubah menjadi **Server Component** (menghapus global `"use client"`).
+- Provider client dipisah ke `src/components/AppClientProviders.js` untuk komponen yang memang butuh browser (`react-hot-toast`, service worker update prompt).
+- Metadata dipindah ke API metadata Next.js (`metadata`, `viewport`) agar lebih optimal untuk rendering App Router.
+
+### Poin 2 - Dashboard filtering di-memoize
+
+- Filter/sort list pengeluaran kini dihitung sekali lewat `useMemo`, bukan dipanggil berulang di setiap render.
+- Perhitungan turunan (`totalExpenses`, `totalTransactions`) juga memoized dari hasil filter.
+- Update state edit/hapus memakai functional state update (`setExpenses(prev => ...)`) agar lebih stabil dan menghindari stale closure.
+
+### Optimasi mobile PWA tambahan
+
+- Halaman dashboard dan summary kini merender **satu versi UI saja** (mobile atau desktop), bukan keduanya sekaligus lalu disembunyikan via CSS.
+- `sweetalert2` di dashboard di-load saat aksi hapus dijalankan (lazy on interaction).
+- Komponen chart summary (`recharts`) dan komponen mobile summary di-load dinamis (`next/dynamic`) sehingga initial payload mobile lebih ringan.
+
+### Dampak praktis
+
+- Hydration payload awal lebih kecil.
+- Render dashboard lebih ringan saat data transaksi bertambah.
+- Respons UI lebih stabil di device low-end dan cold start environment.

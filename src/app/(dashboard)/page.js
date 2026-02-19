@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { getExpenses, supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import Swal from "sweetalert2";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
 // Components
@@ -15,8 +16,14 @@ import EditExpenseModal from "./components/EditExpenseModal";
 import ImageZoomModal from "./components/ImageZoomModal";
 import DashboardFilters from "./components/DashboardFilters";
 import AllowanceModal from "./components/AllowanceModal";
-import MobileDashboard from "@/components/mobile/MobileDashboard";
-import MobileExpenseDetailSheet from "@/components/mobile/MobileExpenseDetailSheet";
+
+const MobileDashboard = dynamic(() => import("@/components/mobile/MobileDashboard"), {
+  ssr: false,
+});
+
+const MobileExpenseDetailSheet = dynamic(() => import("@/components/mobile/MobileExpenseDetailSheet"), {
+  ssr: false,
+});
 
 // =============================================================================
 // PERIOD-BASED EXPENSE FILTERING HELPER
@@ -61,6 +68,7 @@ const getPeriodLabel = (frequency) => {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { isMobile, isReady } = useIsMobile();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -154,6 +162,8 @@ export default function DashboardPage() {
   }, [user, loadAllowance, loadExpenses]);
 
   const handleDelete = async (id) => {
+    const { default: Swal } = await import("sweetalert2");
+
     const result = await Swal.fire({
       title: "Yakin mau hapus?",
       text: "Data pengeluaran ini tidak bisa dikembalikan.",
@@ -176,7 +186,7 @@ export default function DashboardPage() {
     });
 
     if (response.ok) {
-      setExpenses(expenses.filter((e) => e.id !== id));
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
       setSelectedExpense(null);
       loadAllowance();
 
@@ -189,7 +199,7 @@ export default function DashboardPage() {
   };
 
   const handleUpdate = (updatedExpense) => {
-    setExpenses(expenses.map((e) => (e.id === updatedExpense.id ? updatedExpense : e)));
+    setExpenses((prev) => prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e)));
     loadAllowance();
   };
 
@@ -207,9 +217,7 @@ export default function DashboardPage() {
     [periodExpenses]
   );
 
-  if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
-
-  const getFilteredExpenses = () => {
+  const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
 
     // Filter bulan
@@ -244,12 +252,20 @@ export default function DashboardPage() {
     }
 
     return filtered;
-  };
-  const totalExpenses = getFilteredExpenses().reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses, filters]);
+
+  const totalExpenses = useMemo(
+    () => filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
+    [filteredExpenses]
+  );
+
+  if (!isReady) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
+
+  if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
   
   return (
     <>
-      <div className="hidden md:block space-y-6">
+      {!isMobile && <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -277,7 +293,7 @@ export default function DashboardPage() {
           </div>
         )}
         {/* Summary Cards */}
-        <SummaryCards totalExpenses={totalExpenses} totalTransactions={getFilteredExpenses().length} allowanceTotal={allowance?.total || 0} allowanceRemaining={allowance?.remaining || 0} />
+        <SummaryCards totalExpenses={totalExpenses} totalTransactions={filteredExpenses.length} allowanceTotal={allowance?.total || 0} allowanceRemaining={allowance?.remaining || 0} />
 
         {/* Error */}
         {error && (
@@ -299,16 +315,16 @@ export default function DashboardPage() {
               <div className="text-center py-12 text-gray-500">Belum ada pengeluaran</div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {getFilteredExpenses().map((expense) => (
+                {filteredExpenses.map((expense) => (
                   <ExpenseListItem key={expense.id} expense={expense} onClick={setSelectedExpense} />
                 ))}
               </ul>
             )}
           </div>
         </div>
-      </div>
+      </div>}
 
-      <div className="md:hidden">
+      {isMobile && <div>
         <MobileDashboard
           user={user}
           expenses={expenses}
@@ -316,12 +332,12 @@ export default function DashboardPage() {
           onSelectExpense={setSelectedExpense}
           onEditBudget={() => setOpen(true)}
         />
-      </div>
+      </div>}
 
       {/* Modals */}
       {selectedExpense && (
         <>
-          <div className="hidden md:block">
+          {!isMobile && <div>
             <ExpenseDetailModal
               expense={selectedExpense}
               onClose={() => setSelectedExpense(null)}
@@ -329,8 +345,8 @@ export default function DashboardPage() {
               onDelete={handleDelete}
               onZoom={setZoomImage}
             />
-          </div>
-          <div className="md:hidden">
+          </div>}
+          {isMobile && <div>
             <MobileExpenseDetailSheet
               expense={selectedExpense}
               onClose={() => setSelectedExpense(null)}
@@ -338,7 +354,7 @@ export default function DashboardPage() {
               onDelete={handleDelete}
               onZoom={setZoomImage}
             />
-          </div>
+          </div>}
         </>
       )}
 

@@ -2,13 +2,22 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import MobileSummary from "@/components/mobile/MobileSummary";
+
+const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
+const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
+const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
+const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
+const Legend = dynamic(() => import("recharts").then((mod) => mod.Legend), { ssr: false });
+const Tooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), { ssr: false });
+const MobileSummary = dynamic(() => import("@/components/mobile/MobileSummary"), { ssr: false });
 
 export default function SummaryPage() {
   const { user, loading } = useAuth();
+  const { isMobile, isReady } = useIsMobile();
   const router = useRouter();
 
   const [monthlyData, setMonthlyData] = useState([]);
@@ -134,7 +143,7 @@ export default function SummaryPage() {
     return null;
   };
 
-  if (loading || loadingData) {
+  if (!isReady || loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -149,7 +158,7 @@ export default function SummaryPage() {
 
   return (
     <>
-      <div className="hidden md:block max-w-4xl mx-auto p-6">
+      {!isMobile && <div className="max-w-4xl mx-auto p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Ringkasan Bulanan</h1>
           <p className="text-gray-600">Lihat pengeluaran Anda berdasarkan bulan dan kategori</p>
@@ -236,14 +245,14 @@ export default function SummaryPage() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
-      {monthlyData.length > 0 ? (
-        <div className="md:hidden">
+      {isMobile && monthlyData.length > 0 ? (
+        <div>
           <MobileSummary monthlyData={monthlyData} selectedMonth={selectedMonth} onMonthChange={handleMonthChange} currentMonthData={currentMonthData} />
         </div>
-      ) : (
-        <div className="md:hidden text-center py-12 px-4">
+      ) : isMobile ? (
+        <div className="text-center py-12 px-4">
           <div className="text-gray-400 text-6xl mb-4">📊</div>
           <h3 className="text-lg font-medium text-white mb-2">Belum ada data pengeluaran</h3>
           <p className="text-gray-400 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
@@ -251,7 +260,7 @@ export default function SummaryPage() {
             Tambah Pengeluaran
           </button>
         </div>
-      )}
+      ) : null}
     </>
   );
 }
