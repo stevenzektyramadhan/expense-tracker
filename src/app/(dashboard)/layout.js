@@ -58,6 +58,9 @@ export default function DashboardLayout({ children }) {
                 <Link href="/add" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Tambah Pengeluaran
                 </Link>
+                <Link href="/income" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Pendapatan
+                </Link>
                 <Link href="/summary" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Ringkasan
                 </Link>
@@ -98,6 +101,9 @@ export default function DashboardLayout({ children }) {
             </Link>
             <Link href="/add" className="block text-gray-700 hover:text-blue-600" onClick={() => setIsOpen(false)}>
               Tambah Pengeluaran
+            </Link>
+            <Link href="/income" className="block text-gray-700 hover:text-blue-600" onClick={() => setIsOpen(false)}>
+              Pendapatan
             </Link>
             <Link href="/summary" className="block text-gray-700 hover:text-blue-600" onClick={() => setIsOpen(false)}>
               Ringkasan

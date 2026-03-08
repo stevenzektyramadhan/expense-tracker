@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ChevronDown, Search } from "./icons";
 import { Pencil } from "lucide-react";
 import MobileShell from "./MobileShell";
@@ -42,6 +43,10 @@ const getMonthName = (dateString) => {
   return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 };
 
+const getCurrentMonthName = () => {
+  return new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+};
+
 const getCategoryColor = (category) => {
   const colors = {
     Transportasi: "bg-blue-500",
@@ -54,9 +59,9 @@ const getCategoryColor = (category) => {
   return colors[category] || "bg-gray-500";
 };
 
-export default function MobileDashboard({ user, expenses = [], allowance, onSelectExpense = () => {}, onEditBudget = () => {} }) {
+export default function MobileDashboard({ user, expenses = [], additionalIncomes = [], allowance, onSelectExpense = () => {}, onEditBudget = () => {} }) {
   const router = useRouter();
-  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterMonth, setFilterMonth] = useState(getCurrentMonthName);
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchDesc, setSearchDesc] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -134,7 +139,16 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
   }, [user]); // Re-run only when user object changes
 
 
-  const uniqueMonths = useMemo(() => [...new Set(expenses.map((e) => getMonthName(e.date)))], [expenses]);
+  const uniqueMonths = useMemo(() => {
+    const months = [...new Set(expenses.map((e) => getMonthName(e.date)))];
+    const currentMonth = getCurrentMonthName();
+
+    if (!months.includes(currentMonth)) {
+      months.unshift(currentMonth);
+    }
+
+    return months;
+  }, [expenses]);
   const categories = useMemo(() => {
     const unique = new Set(expenses.map((e) => e.category));
     return unique.size ? Array.from(unique) : ["Makanan", "Transportasi", "Lainnya"];
@@ -176,6 +190,18 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
     () => periodExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
     [periodExpenses]
   );
+
+  const totalAdditionalIncome = useMemo(
+    () => additionalIncomes.reduce((sum, income) => sum + (income.amount || 0), 0),
+    [additionalIncomes]
+  );
+
+  const latestIncomes = useMemo(() => additionalIncomes.slice(0, 3), [additionalIncomes]);
+
+  const baseBudget = useMemo(() => {
+    if (!allowance) return 0;
+    return Math.max(Number(allowance.amount) - totalAdditionalIncome, 0);
+  }, [allowance, totalAdditionalIncome]);
 
   // Calculate average using period-filtered expenses (not user search filter)
   const avgPerTransaction = periodExpenses.length > 0 ? totalExpense / periodExpenses.length : 0;
@@ -228,6 +254,18 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
             Balance {currentFrequency === 'weekly' ? '(Mingguan)' : '(Bulanan)'}
           </p>
           <h2 className="text-4xl font-bold text-white">Rp {formatCurrency(remainingBudget)}</h2>
+          <p className="text-white text-xs mt-2 opacity-80">Budget awal Rp {formatCurrency(baseBudget)} + tambahan Rp {formatCurrency(totalAdditionalIncome)}</p>
+        </div>
+
+        <div className="bg-gradient-to-r from-emerald-600 to-green-500 rounded-3xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-white text-sm opacity-90">Pendapatan Tambahan</p>
+            <Link href="/income" className="text-xs bg-white/20 px-2 py-1 rounded-lg">Lihat</Link>
+          </div>
+          <h3 className="text-2xl font-bold text-white">Rp {formatCurrency(totalAdditionalIncome)}</h3>
+          <Link href="/income/add" className="inline-block mt-3 text-xs bg-white/20 px-3 py-1.5 rounded-lg">
+            + Tambah Pendapatan
+          </Link>
         </div>
 
         <div className="bg-gradient-to-r from-blue-700 to-blue-900 rounded-3xl p-6 mb-6">
@@ -333,6 +371,29 @@ export default function MobileDashboard({ user, expenses = [], allowance, onSele
 
             {filteredExpenses.length === 0 && (
               <div className="text-center text-gray-400 py-8">Belum ada pengeluaran untuk filter ini.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">Pendapatan Terbaru</h3>
+            <Link href="/income" className="text-emerald-400 text-sm">Semua</Link>
+          </div>
+
+          <div className="space-y-3">
+            {latestIncomes.map((income) => (
+              <div key={income.id} className="bg-gray-800 rounded-2xl p-4 w-full flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-white">{income.source || "Pendapatan tambahan"}</p>
+                  <p className="text-gray-400 text-xs">{formatDate(income.date)}</p>
+                </div>
+                <p className="text-emerald-400 font-semibold">Rp {formatCurrency(income.amount)}</p>
+              </div>
+            ))}
+
+            {latestIncomes.length === 0 && (
+              <div className="text-center text-gray-400 py-6 bg-gray-800 rounded-2xl">Belum ada pendapatan tambahan.</div>
             )}
           </div>
         </div>

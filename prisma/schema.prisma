@@ -57,5 +57,23 @@ model allowances {
   created_at DateTime? @default(now()) @db.Timestamptz(6)
   updated_at DateTime? @default(now()) @db.Timestamptz(6)
 
-  expenses   expenses[]
+  expenses           expenses[]
+  additional_incomes additional_incomes[]
+}
+
+model additional_incomes {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String    @db.Uuid
+  allowance_id String    @db.Uuid
+  amount       Int
+  source       String?
+  note         String?
+  date         DateTime  @db.Timestamp(3)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+
+  allowances allowances @relation(fields: [allowance_id], references: [id])
+
+  @@index([user_id, date(sort: Desc)])
+  @@index([allowance_id])
 }

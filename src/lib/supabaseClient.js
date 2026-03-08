@@ -71,8 +71,18 @@ export const getCurrentUser = async () => {
 };
 
 // Helper functions untuk expenses
-export const getExpenses = async (userId) => {
-  const { data, error } = await supabase.from("expenses").select("*").eq("user_id", userId).order("date", { ascending: false });
+export const getExpenses = async (userId, options = {}) => {
+  let query = supabase.from("expenses").select("*").eq("user_id", userId);
+
+  if (options.startDate) {
+    query = query.gte("date", options.startDate);
+  }
+
+  if (options.endDate) {
+    query = query.lte("date", options.endDate);
+  }
+
+  const { data, error } = await query.order("date", { ascending: false });
 
   return { data, error };
 };
