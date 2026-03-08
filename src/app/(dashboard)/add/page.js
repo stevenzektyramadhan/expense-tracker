@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { formatRupiah, parseRupiah } from "@/lib/utils";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
+import imageCompression from "browser-image-compression";
 import CategorySelect from "../components/CategorySelect";
-import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 import MobileAddExpense from "@/components/mobile/MobileAddExpense";
 
@@ -28,6 +28,7 @@ export default function AddExpensePage() {
   const [receipt, setReceipt] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState("");
   
   // ✅ State untuk display format Rupiah (terpisah dari formData.amount)
   const [displayAmount, setDisplayAmount] = useState("");
@@ -64,40 +65,96 @@ export default function AddExpensePage() {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setReceipt(file);
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      toast.error("File struk harus berupa gambar.", {
+        style: {
+          background: "#1F2937",
+          color: "#FFFFFF",
+          border: "1px solid #374151",
+        },
+        iconTheme: {
+          primary: "#EF4444",
+          secondary: "#FFFFFF",
+        },
+      });
+      return;
+    }
+
+    if (typeof file.size === "number" && file.size > 15 * 1024 * 1024) {
+      toast.error("Ukuran file maksimal 15MB.", {
+        style: {
+          background: "#1F2937",
+          color: "#FFFFFF",
+          border: "1px solid #374151",
+        },
+        iconTheme: {
+          primary: "#EF4444",
+          secondary: "#FFFFFF",
+        },
+      });
+      return;
+    }
+
+    setReceipt(file);
+  };
+
+  const compressReceipt = async (file) => {
+    try {
+      const compressedFile = await imageCompression(file, {
+        maxSizeMB: 0.6,
+        maxWidthOrHeight: 1600,
+        useWebWorker: true,
+        initialQuality: 0.8,
+        fileType: "image/jpeg",
+      });
+
+      if (compressedFile.size >= file.size) {
+        return file;
+      }
+
+      return compressedFile;
+    } catch (error) {
+      console.warn("Receipt compression failed, using original file", error);
+      return file;
     }
   };
 
-  const uploadReceipt = async () => {
-    if (!receipt) return null;
+  const uploadReceipt = async (file) => {
+    if (!file) return null;
 
     setUploading(true);
     try {
       const formDataUpload = new FormData();
-      formDataUpload.append("file", receipt);
+      formDataUpload.append("file", file);
 
       const response = await authenticatedFetch("/api/upload", {
         method: "POST",
         body: formDataUpload,
       });
 
-      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json().catch(() => ({}));
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Upload gagal");
+      }
+
       return data.url;
-    } catch (error) {
-      console.error("Error uploading receipt:", error);
-      alert("Gagal upload struk. Silakan coba lagi.");
-      return null;
     } finally {
       setUploading(false);
     }
   };
 
+  const getSubmitButtonText = () => {
+    if (submitStatus === "compressing") return "Mengompres foto...";
+    if (submitStatus === "uploading") return "Mengupload struk...";
+    if (submitStatus === "saving") return "Menyimpan pengeluaran...";
+    return "Simpan Pengeluaran";
+  };
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    setSubmitting(true);
 
     if (formData.amount === "" || formData.category === "" || formData.date === "") {
       toast.error("Mohon lengkapi semua field wajib.", {
@@ -111,34 +168,30 @@ export default function AddExpensePage() {
           secondary: '#FFFFFF',
         },
       });
-      setSubmitting(false);
+      setSubmitStatus("");
       return;
     }
 
+    setSubmitting(true);
+
     // ✅ selalu definisikan default dulu
     let receiptUrl = null;
-
-    // ✅ upload hanya kalau ada file struk
-    if (receipt) {
-      receiptUrl = await uploadReceipt();
-      if (!receiptUrl) {
-        toast.error("Struk gagal diupload. Coba lagi.", {
-          style: {
-            background: '#1F2937',
-            color: '#FFFFFF',
-            border: '1px solid #374151',
-          },
-          iconTheme: {
-            primary: '#EF4444',
-            secondary: '#FFFFFF',
-          },
-        });
-        setSubmitting(false);
-        return;
-      }
-    }
+    let currentPhase = "saving";
 
     try {
+      if (receipt) {
+        currentPhase = "compressing";
+        setSubmitStatus("compressing");
+        const fileToUpload = await compressReceipt(receipt);
+
+        currentPhase = "uploading";
+        setSubmitStatus("uploading");
+        receiptUrl = await uploadReceipt(fileToUpload);
+      }
+
+      currentPhase = "saving";
+      setSubmitStatus("saving");
+
       // ✅ Kirim data ke API /api/expenses
       // API sudah menangani insert expense + update allowance dalam satu transaksi
       const response = await authenticatedFetch("/api/expenses", {
@@ -151,7 +204,7 @@ export default function AddExpensePage() {
           category: selectedCategory === "Lainnya" ? customCategory || "Lainnya" : selectedCategory,
           date: formData.date,
           description: formData.description,
-          receipt_url: receiptUrl, // ✅ aman meskipun null
+          receipt_url: receiptUrl,
         }),
       });
 
@@ -178,18 +231,33 @@ export default function AddExpensePage() {
       router.push("/");
     } catch (err) {
       console.error("Error saving expense:", err.message);
-      toast.error(err.message || "Gagal menyimpan pengeluaran.", {
-        style: {
-          background: '#1F2937',
-          color: '#FFFFFF',
-          border: '1px solid #374151',
-        },
-        iconTheme: {
-          primary: '#EF4444',
-          secondary: '#FFFFFF',
-        },
-      });
+      if (currentPhase === "uploading") {
+        toast.error("Struk gagal diupload. Coba lagi.", {
+          style: {
+            background: '#1F2937',
+            color: '#FFFFFF',
+            border: '1px solid #374151',
+          },
+          iconTheme: {
+            primary: '#EF4444',
+            secondary: '#FFFFFF',
+          },
+        });
+      } else {
+        toast.error(err.message || "Gagal menyimpan pengeluaran.", {
+          style: {
+            background: '#1F2937',
+            color: '#FFFFFF',
+            border: '1px solid #374151',
+          },
+          iconTheme: {
+            primary: '#EF4444',
+            secondary: '#FFFFFF',
+          },
+        });
+      }
     } finally {
+      setSubmitStatus("");
       setSubmitting(false);
     }
   };
@@ -282,16 +350,16 @@ export default function AddExpensePage() {
               Batal
             </button>
             <button type="submit" disabled={submitting || uploading} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">
-              {submitting ? (
+              {submitting || uploading ? (
                 <span className="flex items-center justify-center">
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Menyimpan...
+                  {getSubmitButtonText()}
                 </span>
               ) : (
-                "Simpan Pengeluaran"
+                getSubmitButtonText()
               )}
             </button>
           </div>
@@ -312,6 +380,7 @@ export default function AddExpensePage() {
           onCancel={() => router.push("/")}
           submitting={submitting}
           uploading={uploading}
+          submitStatus={submitStatus}
         />
       </div>
     </>

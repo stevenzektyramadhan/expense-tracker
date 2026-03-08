@@ -66,6 +66,12 @@ const getPeriodLabel = (frequency) => {
   return frequency === "weekly" ? "Minggu Ini" : "Bulan Ini";
 };
 
+const getCurrentMonthValue = () => {
+  return String(new Date().getMonth() + 1).padStart(2, "0");
+};
+
+const getCurrentYearValue = () => new Date().getFullYear();
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const { isMobile, isReady } = useIsMobile();
@@ -73,11 +79,12 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [allowance, setAllowance] = useState(null);
+  const [additionalIncomes, setAdditionalIncomes] = useState([]);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
   const [zoomImage, setZoomImage] = useState(null);
   const [filters, setFilters] = useState({
-    month: "",
+    month: getCurrentMonthValue(),
     category: "",
     search: "",
     sort: "date-desc",
@@ -143,8 +150,21 @@ export default function DashboardPage() {
 
   const loadExpenses = useCallback(async () => {
     if (!user) return;
+
+    const queryOptions = {};
+
+    if (!isMobile && filters.month) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const monthNumber = Number(filters.month);
+      const lastDay = new Date(year, monthNumber, 0).getDate();
+
+      queryOptions.startDate = `${year}-${String(monthNumber).padStart(2, "0")}-01`;
+      queryOptions.endDate = `${year}-${String(monthNumber).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    }
+
     setLoading(true);
-    const { data, error } = await getExpenses(user.id);
+    const { data, error } = await getExpenses(user.id, queryOptions);
     if (error) {
       setError(error.message);
     } else {
@@ -152,14 +172,46 @@ export default function DashboardPage() {
       setExpenses(data || []);
     }
     setLoading(false);
-  }, [user]);
+  }, [user, isMobile, filters.month]);
+
+  const loadIncomes = useCallback(async () => {
+    if (!user) return;
+
+    const month = Number(filters.month || getCurrentMonthValue());
+    const year = getCurrentYearValue();
+
+    try {
+      const response = await authenticatedFetch(`/api/incomes?month=${month}&year=${year}`);
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Gagal memuat pendapatan tambahan");
+      }
+
+      setAdditionalIncomes(payload.data || []);
+    } catch (err) {
+      console.error("Failed to load incomes", err);
+      setAdditionalIncomes([]);
+    }
+  }, [user, filters.month]);
 
   useEffect(() => {
     if (user) {
       loadAllowance({ shouldPrompt: true });
+    }
+  }, [user, loadAllowance]);
+
+  useEffect(() => {
+    if (user) {
       loadExpenses();
     }
-  }, [user, loadAllowance, loadExpenses]);
+  }, [user, loadExpenses]);
+
+  useEffect(() => {
+    if (user) {
+      loadIncomes();
+    }
+  }, [user, loadIncomes]);
 
   const handleDelete = async (id) => {
     const { default: Swal } = await import("sweetalert2");
@@ -259,6 +311,16 @@ export default function DashboardPage() {
     [filteredExpenses]
   );
 
+  const totalAdditionalIncome = useMemo(
+    () => additionalIncomes.reduce((sum, income) => sum + income.amount, 0),
+    [additionalIncomes]
+  );
+
+  const baseAllowance = useMemo(() => {
+    if (!allowance) return 0;
+    return Math.max(Number(allowance.amount) - totalAdditionalIncome, 0);
+  }, [allowance, totalAdditionalIncome]);
+
   if (!isReady) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
 
   if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
@@ -269,8 +331,23 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <Link href="/add" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-            Tambah Pengeluaran
+          <div className="flex gap-2">
+            <Link href="/income/add" className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+              Tambah Pendapatan
+            </Link>
+            <Link href="/add" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+              Tambah Pengeluaran
+            </Link>
+          </div>
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm text-emerald-700">Pendapatan tambahan bulan ini</p>
+            <p className="text-xl font-bold text-emerald-800">Rp {totalAdditionalIncome.toLocaleString()}</p>
+          </div>
+          <Link href="/income" className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-700">
+            Lihat Riwayat
           </Link>
         </div>
 
@@ -285,11 +362,19 @@ export default function DashboardPage() {
               Dari Rp {allowance.amount.toLocaleString()} ({currentFrequency === "weekly" ? "Mingguan" : "Bulanan"})
             </p>
             <p className="text-sm text-gray-500 mt-1">
+              Uang saku awal: Rp {baseAllowance.toLocaleString()} | Pendapatan tambahan: Rp {totalAdditionalIncome.toLocaleString()}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
               Total Pengeluaran {periodLabel}: Rp {totalPeriodExpenses.toLocaleString()}
             </p>
-            <button className="mt-3 text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700" onClick={() => setOpen(true)}>
-              Atur
-            </button>
+            <div className="mt-3 flex gap-2">
+              <button className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700" onClick={() => setOpen(true)}>
+                Atur
+              </button>
+              <Link href="/income" className="text-sm bg-emerald-600 text-white px-3 py-1 rounded-md hover:bg-emerald-700">
+                Pendapatan
+              </Link>
+            </div>
           </div>
         )}
         {/* Summary Cards */}
@@ -303,7 +388,7 @@ export default function DashboardPage() {
         )}
 
         {/* Filter Bar */}
-        <DashboardFilters categories={["Makanan", "Transportasi", "Lainnya"]} onFilterChange={setFilters} />
+        <DashboardFilters categories={["Makanan", "Transportasi", "Lainnya"]} initialFilters={filters} onFilterChange={setFilters} />
         {/* List */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
@@ -311,7 +396,7 @@ export default function DashboardPage() {
             <p className="mt-1 max-w-2xl text-sm text-gray-500">Pengeluaran terbaru Anda</p>
           </div>
           <div className="border-t border-gray-200">
-            {expenses.length === 0 ? (
+            {filteredExpenses.length === 0 ? (
               <div className="text-center py-12 text-gray-500">Belum ada pengeluaran</div>
             ) : (
               <ul className="divide-y divide-gray-200">
@@ -328,6 +413,7 @@ export default function DashboardPage() {
         <MobileDashboard
           user={user}
           expenses={expenses}
+          additionalIncomes={additionalIncomes}
           allowance={allowance}
           onSelectExpense={setSelectedExpense}
           onEditBudget={() => setOpen(true)}

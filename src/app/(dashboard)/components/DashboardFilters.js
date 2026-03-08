@@ -1,11 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-export default function DashboardFilters({ categories, onFilterChange }) {
-  const [month, setMonth] = useState("");
-  const [category, setCategory] = useState("");
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("date-desc");
+export default function DashboardFilters({ categories, initialFilters, onFilterChange }) {
+  const [month, setMonth] = useState(initialFilters?.month || "");
+  const [category, setCategory] = useState(initialFilters?.category || "");
+  const [search, setSearch] = useState(initialFilters?.search || "");
+  const [sort, setSort] = useState(initialFilters?.sort || "date-desc");
+
+  useEffect(() => {
+    setMonth(initialFilters?.month || "");
+    setCategory(initialFilters?.category || "");
+    setSearch(initialFilters?.search || "");
+    setSort(initialFilters?.sort || "date-desc");
+  }, [initialFilters]);
 
   const handleChange = (field, value) => {
     if (field === "month") setMonth(value);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, PlusCircle, BarChart3, LogOut } from "./icons";
+import { Home, PlusCircle, BarChart3, Wallet, LogOut } from "./icons";
 import { supabase } from "@/lib/supabaseClient";
 import Swal from "sweetalert2";
 
@@ -22,6 +22,7 @@ export default function MobileShell({ children }) {
   const navItems = [
     { href: "/", label: "Home", Icon: Home },
     { href: "/add", label: "Tambah", Icon: PlusCircle },
+    { href: "/income", label: "Income", Icon: Wallet },
     { href: "/summary", label: "Ringkasan", Icon: BarChart3 },
   ];
 
@@ -121,7 +122,7 @@ export default function MobileShell({ children }) {
                   className={`flex flex-col items-center transition ${isActive ? "text-white" : "text-blue-200 hover:text-white"}`} 
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon className="w-7 h-7 mb-1" />
+                  <Icon className="w-6 h-6 mb-1" />
                   <span className="text-xs font-semibold">{label}</span>
                 </Link>
               );
