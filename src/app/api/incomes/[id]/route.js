@@ -77,7 +77,8 @@ export async function PUT(req, { params }) {
     const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
-    const incomeId = params?.id;
+    const resolvedParams = await params;
+    const incomeId = resolvedParams?.id;
     if (!incomeId) {
       return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
     }
@@ -190,7 +191,8 @@ export async function DELETE(req, { params }) {
     const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
-    const incomeId = params?.id;
+    const resolvedParams = await params;
+    const incomeId = resolvedParams?.id;
     if (!incomeId) {
       return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
     }
