@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { formatRupiah, parseRupiah } from "@/lib/utils";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import Swal from "sweetalert2";
 
 // =============================================================================
@@ -12,7 +12,6 @@ import Swal from "sweetalert2";
 // - Frequency selection (weekly or monthly)
 
 export default function AllowanceModal({ 
-  userId, 
   isOpen, 
   onClose, 
   onSaved, 
@@ -54,42 +53,21 @@ export default function AllowanceModal({
 
     setLoading(true);
     try {
-      const month = new Date().getMonth() + 1;
-      const year = new Date().getFullYear();
+      const response = await authenticatedFetch("/api/allowances", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: numericAmount,
+          frequency,
+        }),
+      });
 
-      // cek apakah sudah ada allowance bulan ini
-      const { data: existing } = await supabase
-        .from("allowances")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", month)
-        .eq("year", year)
-        .maybeSingle();
-
-      let result;
-      if (existing) {
-        result = await supabase
-          .from("allowances")
-          .update({
-            amount: numericAmount,
-            remaining: numericAmount,
-            frequency: frequency, // Save selected frequency
-          })
-          .eq("id", existing.id);
-      } else {
-        result = await supabase.from("allowances").insert([
-          {
-            user_id: userId,
-            month,
-            year,
-            amount: numericAmount,
-            remaining: numericAmount,
-            frequency: frequency, // Save selected frequency
-          },
-        ]);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Gagal menyimpan uang saku");
       }
-
-      if (result.error) throw result.error;
 
       Swal.fire("Berhasil", "Uang saku berhasil diatur!", "success");
       onSaved();

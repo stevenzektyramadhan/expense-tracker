@@ -1,3 +1,5 @@
+import { getCategoryBadgeColor } from "@/lib/finance";
+
 export const formatCurrency = (amount) => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -83,10 +85,5 @@ export const formatDateForInput = (dateString) => {
   return `${year}-${month}-${day}`;
 };
 export const getCategoryColor = (category) => {
-  const colors = {
-    Makanan: "bg-green-100 text-green-800",
-    Transportasi: "bg-blue-100 text-blue-800",
-    Lainnya: "bg-gray-100 text-gray-800",
-  };
-  return colors[category] || "bg-gray-100 text-gray-800";
+  return getCategoryBadgeColor(category);
 };

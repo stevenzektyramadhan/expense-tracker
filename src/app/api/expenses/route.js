@@ -15,6 +15,19 @@ const clampRemainingBalance = (value, allowanceAmount) => {
   return value;
 };
 
+const parseDateBoundary = (value, { inclusiveEnd = false } = {}) => {
+  if (!value) return null;
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "invalid";
+
+  if (inclusiveEnd) {
+    date.setDate(date.getDate() + 1);
+  }
+
+  return date;
+};
+
 // =============================================================================
 // POST /api/expenses - Create a new expense and deduct from allowance
 // =============================================================================
@@ -168,6 +181,18 @@ export async function GET(req) {
     const { user, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
 
+    const { searchParams } = new URL(req.url);
+    const startDate = parseDateBoundary(searchParams.get("startDate"));
+    const endDate = parseDateBoundary(searchParams.get("endDate"), { inclusiveEnd: true });
+
+    if (startDate === "invalid" || endDate === "invalid") {
+      return new Response(JSON.stringify({ error: "Invalid date filter" }), { status: 400 });
+    }
+
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = startDate;
+    if (endDate) dateFilter.lt = endDate;
+
     // =========================================================================
     // Fetch all expenses for the user
     // =========================================================================
@@ -176,6 +201,7 @@ export async function GET(req) {
     const expenses = await prisma.expenses.findMany({
       where: {
         user_id: user.id,
+        ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
       },
       orderBy: {
         date: "desc",  // Sort by date descending (newest first)

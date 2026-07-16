@@ -8,28 +8,7 @@ import { Pencil } from "lucide-react";
 import MobileShell from "./MobileShell";
 import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-
-// =============================================================================
-// PERIOD-BASED EXPENSE FILTERING HELPER
-// =============================================================================
-const getExpensesForPeriod = (expenses, frequency) => {
-  const now = new Date();
-  let periodStart, periodEnd;
-  
-  if (frequency === "weekly") {
-    periodStart = startOfWeek(now, { weekStartsOn: 1 });
-    periodEnd = endOfWeek(now, { weekStartsOn: 1 });
-  } else {
-    periodStart = startOfMonth(now);
-    periodEnd = endOfMonth(now);
-  }
-  
-  return expenses.filter((expense) => {
-    const expenseDate = new Date(expense.date);
-    return isWithinInterval(expenseDate, { start: periodStart, end: periodEnd });
-  });
-};
+import { DEFAULT_EXPENSE_CATEGORIES, getCategoryDotColor, getExpensesForPeriod } from "@/lib/finance";
 
 const formatCurrency = (amount = 0) => new Intl.NumberFormat("id-ID").format(amount);
 
@@ -45,18 +24,6 @@ const getMonthName = (dateString) => {
 
 const getCurrentMonthName = () => {
   return new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-};
-
-const getCategoryColor = (category) => {
-  const colors = {
-    Transportasi: "bg-blue-500",
-    Makanan: "bg-green-500",
-    Belanja: "bg-purple-500",
-    Hiburan: "bg-pink-500",
-    Kesehatan: "bg-red-500",
-    Lainnya: "bg-gray-500",
-  };
-  return colors[category] || "bg-gray-500";
 };
 
 export default function MobileDashboard({ user, expenses = [], additionalIncomes = [], allowance, onSelectExpense = () => {}, onEditBudget = () => {} }) {
@@ -136,7 +103,7 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
     };
 
     promptForName();
-  }, [user]); // Re-run only when user object changes
+  }, [user, router]); // Re-run when auth user or router instance changes
 
 
   const uniqueMonths = useMemo(() => {
@@ -151,7 +118,7 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
   }, [expenses]);
   const categories = useMemo(() => {
     const unique = new Set(expenses.map((e) => e.category));
-    return unique.size ? Array.from(unique) : ["Makanan", "Transportasi", "Lainnya"];
+    return unique.size ? Array.from(unique) : DEFAULT_EXPENSE_CATEGORIES;
   }, [expenses]);
 
   const filteredExpenses = useMemo(() => {
@@ -354,7 +321,7 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
                 className="bg-gray-800 rounded-2xl p-4 w-full flex items-center justify-between text-left hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 ${getCategoryColor(expense.category)} rounded-full flex items-center justify-center`}>
+                  <div className={`w-10 h-10 ${getCategoryDotColor(expense.category)} rounded-full flex items-center justify-center`}>
                     <span className="text-white text-lg">💰</span>
                   </div>
                   <div>

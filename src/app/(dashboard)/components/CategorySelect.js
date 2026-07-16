@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";
 
 export default function CategorySelect({ value, onChange, customValue, onCustomChange }) {
   const [showCustomInput, setShowCustomInput] = useState(value === "Lainnya");
@@ -15,9 +16,11 @@ export default function CategorySelect({ value, onChange, customValue, onCustomC
 
       {/* Dropdown */}
       <select name="category" value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-full border rounded px-2 py-1 bg-white">
-        <option value="Makanan">Makanan</option>
-        <option value="Transportasi">Transportasi</option>
-        <option value="Lainnya">Lainnya</option>
+        {DEFAULT_EXPENSE_CATEGORIES.map((category) => (
+          <option key={category} value={category}>
+            {category}
+          </option>
+        ))}
       </select>
 
       {/* Custom kategori muncul jika pilih Lainnya */}
