@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import MobileShell from "./MobileShell";
+import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";
 import { formatRupiah, parseRupiah } from "@/lib/utils";
 
 export default function MobileAddExpense({
@@ -19,10 +20,7 @@ export default function MobileAddExpense({
   uploading,
   submitStatus,
 }) {
-  const categories = useMemo(
-    () => ["Makanan", "Transportasi", "Belanja", "Hiburan", "Kesehatan", "Lainnya"],
-    []
-  );
+  const categories = DEFAULT_EXPENSE_CATEGORIES;
 
   // ✅ Local state untuk display format Rupiah
   const [displayAmount, setDisplayAmount] = useState("");

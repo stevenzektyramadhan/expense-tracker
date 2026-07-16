@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { setAllowance } from "@/lib/supabaseClient";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import Swal from "sweetalert2";
 
 export default function AllowancePage() {
@@ -12,14 +12,27 @@ export default function AllowancePage() {
     if (!user) return;
 
     const parsedAmount = parseFloat(amount);
-    const { error } = await setAllowance({
-      userId: user.id,
-      amount: parsedAmount,
-    });
-    if (error) {
-      Swal.fire("Error", "Gagal menyimpan uang saku", "error");
-    } else {
+
+    try {
+      const response = await authenticatedFetch("/api/allowances", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: parsedAmount,
+          frequency: "monthly",
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Gagal menyimpan uang saku");
+      }
+
       Swal.fire("Berhasil", "Uang saku berhasil disimpan", "success");
+    } catch (error) {
+      Swal.fire("Error", error.message || "Gagal menyimpan uang saku", "error");
     }
   };
 

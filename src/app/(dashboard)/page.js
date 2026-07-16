@@ -4,9 +4,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { getExpenses, supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { DEFAULT_EXPENSE_CATEGORIES, getExpensesForPeriod, getPeriodLabel } from "@/lib/finance";
 
 // Components
 import SummaryCards from "./components/SummaryCards";
@@ -24,47 +23,6 @@ const MobileDashboard = dynamic(() => import("@/components/mobile/MobileDashboar
 const MobileExpenseDetailSheet = dynamic(() => import("@/components/mobile/MobileExpenseDetailSheet"), {
   ssr: false,
 });
-
-// =============================================================================
-// PERIOD-BASED EXPENSE FILTERING HELPER
-// =============================================================================
-/**
- * Filters expenses based on the current period (week or month).
- * Uses date-fns for robust date calculations.
- * 
- * @param {Array} expenses - Array of expense objects with 'date' field
- * @param {string} frequency - 'weekly' or 'monthly'
- * @returns {Array} - Filtered expenses within the current period
- */
-const getExpensesForPeriod = (expenses, frequency) => {
-  const now = new Date();
-  
-  let periodStart, periodEnd;
-  
-  if (frequency === "weekly") {
-    // Week starts on Monday (weekStartsOn: 1)
-    periodStart = startOfWeek(now, { weekStartsOn: 1 });
-    periodEnd = endOfWeek(now, { weekStartsOn: 1 });
-  } else {
-    // Default to monthly
-    periodStart = startOfMonth(now);
-    periodEnd = endOfMonth(now);
-  }
-  
-  return expenses.filter((expense) => {
-    const expenseDate = new Date(expense.date);
-    return isWithinInterval(expenseDate, { start: periodStart, end: periodEnd });
-  });
-};
-
-/**
- * Returns the appropriate label for the current period.
- * @param {string} frequency - 'weekly' or 'monthly'
- * @returns {string} - "Minggu Ini" or "Bulan Ini"
- */
-const getPeriodLabel = (frequency) => {
-  return frequency === "weekly" ? "Minggu Ini" : "Bulan Ini";
-};
 
 const getCurrentMonthValue = () => {
   return String(new Date().getMonth() + 1).padStart(2, "0");
@@ -113,15 +71,16 @@ export default function DashboardPage() {
         }
       };
 
-      const { data, error } = await supabase
-        .from("allowances")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("month", month)
-        .eq("year", year)
-        .maybeSingle();
+      let data = null;
 
-      if (error) {
+      try {
+        const response = await authenticatedFetch("/api/allowances");
+        data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to load allowance");
+        }
+      } catch (error) {
         console.error("Failed to load allowance", error);
         setAllowance(null);
 
@@ -133,7 +92,11 @@ export default function DashboardPage() {
       }
 
       if (data) {
-        setAllowance(data);
+        setAllowance({
+          ...data,
+          amount: Number(data.amount),
+          remaining: Number(data.remaining),
+        });
         markPeriodHandled();
         return;
       }
@@ -164,12 +127,23 @@ export default function DashboardPage() {
     }
 
     setLoading(true);
-    const { data, error } = await getExpenses(user.id, queryOptions);
-    if (error) {
-      setError(error.message);
-    } else {
+    try {
+      const params = new URLSearchParams();
+      if (queryOptions.startDate) params.set("startDate", queryOptions.startDate);
+      if (queryOptions.endDate) params.set("endDate", queryOptions.endDate);
+
+      const url = params.toString() ? `/api/expenses?${params.toString()}` : "/api/expenses";
+      const response = await authenticatedFetch(url);
+      const data = await response.json().catch(() => []);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal memuat pengeluaran");
+      }
+
       setError("");
       setExpenses(data || []);
+    } catch (error) {
+      setError(error.message);
     }
     setLoading(false);
   }, [user, isMobile, filters.month]);
@@ -388,7 +362,7 @@ export default function DashboardPage() {
         )}
 
         {/* Filter Bar */}
-        <DashboardFilters categories={["Makanan", "Transportasi", "Lainnya"]} initialFilters={filters} onFilterChange={setFilters} />
+        <DashboardFilters categories={DEFAULT_EXPENSE_CATEGORIES} initialFilters={filters} onFilterChange={setFilters} />
         {/* List */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
@@ -455,8 +429,7 @@ export default function DashboardPage() {
           setOpen(false);
           loadAllowance?.(); // refresh data di parent
         }}
-        userId={user?.id}
-        initialAmount={allowance?.amount || 0}
+        initialAmount={allowance ? baseAllowance : 0}
         initialFrequency={allowance?.frequency || "monthly"}
       />
     </>

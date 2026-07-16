@@ -1,227 +1,212 @@
-# 📖 Personal Expense Tracker
+# kiteCatat Expense Tracker
 
-Aplikasi web untuk **mencatat pengeluaran pribadi** menggunakan **Next.js, Supabase, dan Cloudinary**.
+kiteCatat adalah aplikasi web personal finance untuk mencatat uang saku, pengeluaran, pendapatan tambahan, dan ringkasan bulanan. Aplikasi ini memakai Next.js App Router, Supabase Auth/Postgres, Prisma, Cloudinary, dan PWA support.
 
-MVP ini ditujukan untuk penggunaan pribadi & lingkar terdekat, dengan fitur:
+## Main Features
 
-- ✅ Login/registrasi
-- ✅ Tambah & lihat pengeluaran
-- ✅ Ringkasan bulanan
-- ✅ (Opsional) Upload bukti struk ke Cloudinary
+- Login, register, forgot password, dan update password dengan Supabase Auth.
+- Dashboard desktop dan mobile.
+- Atur allowance atau uang saku per periode.
+- Tambah, edit, hapus pengeluaran.
+- Tambah, edit, hapus pendapatan tambahan.
+- Upload struk ke Cloudinary.
+- Ringkasan pengeluaran berdasarkan bulan dan kategori.
+- PWA service worker dan update prompt.
+- API internal session-based untuk data finance.
+- Database hardening plan: indexes, unique allowance per periode, dan Supabase RLS policies.
 
----
+## Tech Stack
 
-## 🚀 Tech Stack
+- Next.js App Router
+- React
+- Tailwind CSS
+- Prisma 7 with PostgreSQL adapter
+- Supabase Auth and Postgres
+- Cloudinary
+- Recharts
+- next-pwa
 
-- **Next.js (App Router)** → Frontend & API routes
-- **TailwindCSS** → Styling UI
-- **Supabase** → Authentication + Postgres Database + Row Level Security (RLS)
-- **Cloudinary** → Media storage untuk foto struk
-- **Vercel** → (opsional) Deployment
+## Project Structure
 
----
-
-## 📂 Folder Structure
-
-```
+```text
 expense-tracker/
-├─ app/                       # Next.js App Router
-│  ├─ (auth)/                 # Auth pages (doesn't affect URL)
-│  │  ├─ login/page.js
-│  │  ├─ register/page.js
-│  │
-│  ├─ (dashboard)/            # Dashboard pages
-│  │  ├─ layout.js            # Layout with navbar/sidebar
-│  │  ├─ page.js              # List pengeluaran
-│  │  ├─ add/page.js          # Form tambah pengeluaran
-│  │  ├─ summary/page.js      # Ringkasan bulanan
-│  │
-│  ├─ api/                    # API Routes
-│  │  ├─ upload/route.js      # Upload struk ke Cloudinary
-│  │
-│  ├─ layout.js               # Root layout
-│  └─ page.js                 # Landing page / redirect
-│
-├─ components/                # Reusable components
-│  ├─ ui/                     # Basic UI (Button, Card, Input)
-│  ├─ forms/                  # Form-specific components
-│
-├─ hooks/                     # Custom hooks (useAuth, useExpenses)
-├─ lib/                       # Helpers
-│  ├─ supabaseClient.js       # Supabase init
-│  ├─ cloudinary.js           # Cloudinary init
-│
-├─ styles/                    # Tailwind styles
-│  ├─ globals.css
-├─ public/                    # Static assets
-├─ .env.local                 # Env variables
-├─ tailwind.config.js
-├─ jsconfig.json              # Path alias (@)
-└─ README.md
+  prisma/
+    schema.prisma
+    migrations/
+  public/
+    manifest.json
+    sw.js
+    workbox-*.js
+  src/
+    app/
+      (auth)/
+      (dashboard)/
+      api/
+      auth/
+      globals.css
+      layout.js
+    components/
+      mobile/
+    hooks/
+    lib/
+      authenticatedFetch.js
+      finance.js
+      prisma.js
+      supabase.js
+      supabaseClient.js
+      supabaseServer.js
+      utils.js
+  next.config.mjs
+  package.json
 ```
 
----
+## Environment Variables
 
-## 🔧 Setup & Installation
+Create `.env` for local development. Do not commit `.env*`.
 
-1. **Clone repo & install dependencies**
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-```bash
-git clone <repo-url>
-cd expense-tracker
+DATABASE_URL=your-postgres-connection-url
+DIRECT_URL=your-direct-postgres-connection-url
+
+CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+```
+
+Notes:
+
+- Only `NEXT_PUBLIC_*` values are exposed to the browser.
+- `DATABASE_URL`, `DIRECT_URL`, and Cloudinary secrets must stay server-only.
+- Supabase service role keys must not be used in client code.
+
+## Local Setup
+
+Install dependencies:
+
+```powershell
 npm install
 ```
 
-2. **Setup Supabase**
+Generate Prisma client:
 
-   - Buat project di [Supabase](https://supabase.com)
-   - Aktifkan Email Auth
-   - Buat tabel `expenses`
-
-   ```sql
-   CREATE TABLE expenses (
-     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-     amount DECIMAL(10,2) NOT NULL,
-     category VARCHAR(50) NOT NULL,
-     date DATE NOT NULL,
-     description TEXT,
-     receipt_url TEXT,
-     created_at TIMESTAMP DEFAULT NOW()
-   );
-
-   ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
-
-   CREATE POLICY "Users can view own expenses"
-   ON expenses FOR SELECT USING (auth.uid() = user_id);
-
-   CREATE POLICY "Users can insert own expenses"
-   ON expenses FOR INSERT WITH CHECK (auth.uid() = user_id);
-   ```
-
-3. **Setup Cloudinary** (opsional, untuk upload struk)
-
-   - Buat akun [Cloudinary](https://cloudinary.com)
-   - Ambil `CLOUD_NAME`, `API_KEY`, `API_SECRET`
-
-4. \*\*Buat file \*\*\`\`
-
-```
-NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-
-CLOUDINARY_CLOUD_NAME=<your-cloudinary-name>
-CLOUDINARY_API_KEY=<your-cloudinary-api-key>
-CLOUDINARY_API_SECRET=<your-cloudinary-api-secret>
+```powershell
+npx prisma generate
 ```
 
-5. **Jalankan dev server**
+Run development server:
 
-```bash
-npm run dev
+```powershell
+npm.cmd run dev
 ```
 
-6. **Build & Production**
+Build production:
 
-```bash
-npm run build
-npm start
+```powershell
+npm.cmd run build
 ```
 
----
+Run production server after build:
 
-## 🗄 Database Schema
+```powershell
+npm.cmd start
+```
 
-Tabel utama: **expenses**
+## Scripts
 
-| Field       | Type          | Description                  |
-| ----------- | ------------- | ---------------------------- |
-| id          | UUID (PK)     | Auto-generated ID            |
-| user_id     | UUID          | Reference ke `auth.users.id` |
-| amount      | DECIMAL(10,2) | Jumlah pengeluaran           |
-| category    | VARCHAR(50)   | Makanan, Transportasi, dll   |
-| date        | DATE          | Tanggal pengeluaran          |
-| description | TEXT          | Deskripsi optional           |
-| receipt_url | TEXT          | URL bukti struk (Cloudinary) |
-| created_at  | TIMESTAMP     | Waktu insert                 |
+```powershell
+npm.cmd run dev
+npm.cmd run build
+npm.cmd start
+npm.cmd run lint
+```
 
----
+`npm.cmd run lint` runs:
 
-## ✨ Fitur
+```text
+eslint src --max-warnings=0
+```
 
-- ✅ **Autentikasi Supabase** (email/password)
-- ✅ **Tambah pengeluaran** (amount, kategori, tanggal, deskripsi, upload struk opsional)
-- ✅ **List pengeluaran** user (hanya bisa lihat data sendiri)
-- ✅ **Ringkasan bulanan** (total + per kategori)
-- ✅ **Row Level Security** di Supabase → aman untuk multi-user
+## Database And Supabase Safety
 
----
+This project uses Supabase Postgres. Treat production data carefully.
 
-## 🔐 Security Hardening (Phase 1)
+Before applying database changes to Supabase production:
 
-Mulai fase ini, endpoint API internal menggunakan model **session-only**:
+1. Confirm the target environment.
+2. Confirm a recent backup exists.
+3. Run read-only preflight checks first.
+4. Review duplicate allowances and orphan/mismatched ownership rows.
+5. Apply migrations to local/staging first when available.
+6. Apply production changes only after explicit approval.
 
-- Endpoint tidak lagi mempercayai `user_id` dari body/query.
-- User diambil dari session cookie Supabase di server.
-- Jika session tidak valid, API mengembalikan `401 Unauthorized`.
+Do not run these commands against production without explicit approval:
 
-### Endpoint yang di-hardening
+- `supabase db reset`
+- `prisma migrate reset`
+- `DROP TABLE`
+- `DROP SCHEMA`
+- `TRUNCATE`
+- unscoped `DELETE`
+- unscoped `UPDATE`
 
-- `POST /api/expenses`
-- `GET /api/expenses`
-- `GET /api/summary`
-- `POST /api/allowances`
-- `GET /api/allowances`
-- `POST /api/upload`
-- `DELETE /api/upload`
+## Database Hardening
 
-### Validasi upload
+The database hardening migration is:
 
-- Hanya menerima file bertipe image (`image/*`)
-- Maksimal ukuran file: **5MB**
+```text
+prisma/migrations/20260715143000_harden_finance_security/migration.sql
+```
 
-### Dampak ke frontend
+It adds indexes, a unique allowance index, and RLS policies for finance tables.
 
-- Frontend tidak perlu (dan tidak boleh mengandalkan) `user_id` untuk endpoint di atas.
-- Contoh: request ringkasan menjadi `GET /api/summary` tanpa query `user_id`.
+The hardening migration is committed as a reviewable file. It has not been applied to Supabase by this agent.
 
-## ⚖️ Data Consistency (Phase 2)
+## Finance Rules
 
-Fase ini memastikan `allowances.remaining` tetap sinkron saat pengeluaran diubah atau dihapus.
+Important invariant:
 
-- `PUT /api/expenses` sekarang mengubah expense **dan** menyesuaikan `allowances.remaining` dalam satu transaksi database.
-- `DELETE /api/expenses` sekarang menghapus expense **dan** mengembalikan nominal ke `allowances.remaining` dalam satu transaksi database.
-- Operasi update/delete expense dari UI dashboard sudah dipindahkan ke API ini (tidak lagi update/delete langsung dari client ke tabel `expenses`).
+```text
+allowances.amount = base allowance + total additional incomes
+allowances.remaining = allowances.amount - total linked expenses
+```
 
-### Aturan saldo
+Client code must not control `user_id`, `remaining`, or `allowance_id` for balance updates.
 
-- Update nominal expense yang membuat saldo jadi negatif akan ditolak (`400`).
-- Saat pengembalian saldo (mis. delete), nilai `remaining` di-clamp agar tidak melebihi nilai `amount` allowance.
+## Security Review
 
-## ⚡ Performance (Vercel Free Tier)
+Security focus areas:
 
-Optimasi ini fokus ke pengurangan JavaScript client dan kerja ulang render agar cocok untuk limit resource di Vercel gratis.
+- Broken object level authorization and IDOR.
+- Supabase RLS.
+- Upload validation and Cloudinary asset ownership.
+- CSRF/origin strategy for mutation endpoints.
+- XSS from user text fields.
+- Secret exposure.
+- Dependency audit and supply chain risk.
 
-### Poin 1 - Root Layout diringankan
+## Regression Checklist
 
-- `src/app/layout.js` diubah menjadi **Server Component** (menghapus global `"use client"`).
-- Provider client dipisah ke `src/components/AppClientProviders.js` untuk komponen yang memang butuh browser (`react-hot-toast`, service worker update prompt).
-- Metadata dipindah ke API metadata Next.js (`metadata`, `viewport`) agar lebih optimal untuk rendering App Router.
+Minimum checks before release:
 
-### Poin 2 - Dashboard filtering di-memoize
+```powershell
+npm.cmd run lint
+npm.cmd run build
+```
 
-- Filter/sort list pengeluaran kini dihitung sekali lewat `useMemo`, bukan dipanggil berulang di setiap render.
-- Perhitungan turunan (`totalExpenses`, `totalTransactions`) juga memoized dari hasil filter.
-- Update state edit/hapus memakai functional state update (`setExpenses(prev => ...)`) agar lebih stabil dan menghindari stale closure.
+Also manually review these flows:
 
-### Optimasi mobile PWA tambahan
+- allowance update after expenses/incomes,
+- overspending rejection,
+- two-user IDOR tests,
+- upload abuse tests,
+- RLS two-user tests.
 
-- Halaman dashboard dan summary kini merender **satu versi UI saja** (mobile atau desktop), bukan keduanya sekaligus lalu disembunyikan via CSS.
-- `sweetalert2` di dashboard di-load saat aksi hapus dijalankan (lazy on interaction).
-- Komponen chart summary (`recharts`) dan komponen mobile summary di-load dinamis (`next/dynamic`) sehingga initial payload mobile lebih ringan.
+## Current Known Residual Risks
 
-### Dampak praktis
-
-- Hydration payload awal lebih kecil.
-- Render dashboard lebih ringan saat data transaksi bertambah.
-- Respons UI lebih stabil di device low-end dan cold start environment.
+- `npm audit` still reports vulnerabilities that require breaking-change dependency decisions around Prisma, Next, and next-pwa transitive dependencies.
+- Upload delete is fail-closed until receipt `public_id` ownership mapping is stored in the database.
+- CSRF/origin validation for mutation endpoints still needs a dedicated follow-up.
+- Automated unit/integration tests are not yet configured.

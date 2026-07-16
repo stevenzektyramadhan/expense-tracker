@@ -9,6 +9,22 @@
 import prisma from "@/lib/prisma";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
+const ALLOWED_FREQUENCIES = new Set(["weekly", "monthly"]);
+
+const serializeAllowance = (allowance) => ({
+  ...allowance,
+  amount: allowance.amount.toString(),
+  remaining: allowance.remaining.toString(),
+});
+
+const getCurrentPeriod = () => {
+  const now = new Date();
+  return {
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+  };
+};
+
 // =============================================================================
 // POST /api/allowances - Create or return existing allowance for current month
 // =============================================================================
@@ -28,9 +44,7 @@ export async function POST(req) {
     }
 
     // Get current month and year to find or create the correct allowance
-    const now = new Date();
-    const month = now.getMonth() + 1; // JavaScript months are 0-indexed, so add 1 (1-12)
-    const year = now.getFullYear();
+    const { month, year } = getCurrentPeriod();
 
     // =========================================================================
     // STEP 1: Check if an allowance already exists for this month/year
@@ -51,12 +65,7 @@ export async function POST(req) {
     if (existing) {
       // Convert Decimal fields to strings for JSON serialization
       // Prisma returns Decimal objects which need conversion for JSON response
-      const responseData = {
-        ...existing,
-        amount: existing.amount.toString(),
-        remaining: existing.remaining.toString(),
-      };
-      return new Response(JSON.stringify(responseData), { status: 200 });
+      return new Response(JSON.stringify(serializeAllowance(existing)), { status: 200 });
     }
 
     // =========================================================================
@@ -80,13 +89,7 @@ export async function POST(req) {
     // Convert Decimal fields to strings for JSON serialization
     // This is necessary because JSON.stringify() doesn't know how to handle
     // Prisma's Decimal type (which uses decimal.js internally)
-    const responseData = {
-      ...newAllowance,
-      amount: newAllowance.amount.toString(),
-      remaining: newAllowance.remaining.toString(),
-    };
-
-    return new Response(JSON.stringify(responseData), { status: 200 });
+    return new Response(JSON.stringify(serializeAllowance(newAllowance)), { status: 200 });
   } catch (err) {
     // Log the full error for debugging (visible in server console)
     console.error("Allowances POST error:", err);
@@ -107,9 +110,7 @@ export async function GET(req) {
     if (errorResponse) return errorResponse;
 
     // Get current month and year
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
+    const { month, year } = getCurrentPeriod();
 
     // Query for the current month's allowance using Prisma
     // findFirst returns null if no record is found (no error thrown)
@@ -127,15 +128,124 @@ export async function GET(req) {
     }
 
     // Convert Decimal fields to strings for JSON serialization
-    const responseData = {
-      ...allowance,
-      amount: allowance.amount.toString(),
-      remaining: allowance.remaining.toString(),
-    };
-
-    return new Response(JSON.stringify(responseData), { status: 200 });
+    return new Response(JSON.stringify(serializeAllowance(allowance)), { status: 200 });
   } catch (err) {
     console.error("Allowances GET error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+
+// =============================================================================
+// PUT /api/allowances - Create or update current allowance safely
+// =============================================================================
+// Request body: { amount, frequency }
+// `amount` is treated as the user's base allowance. Existing additional income
+// is preserved by adding it to the stored total allowance amount.
+export async function PUT(req) {
+  try {
+    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    if (errorResponse) return errorResponse;
+
+    const { amount, frequency = "monthly" } = await req.json();
+
+    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
+      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
+        status: 400,
+      });
+    }
+
+    if (!ALLOWED_FREQUENCIES.has(frequency)) {
+      return new Response(JSON.stringify({ error: "frequency is invalid" }), { status: 400 });
+    }
+
+    const baseAmount = Math.round(amount);
+    const { month, year } = getCurrentPeriod();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.allowances.findFirst({
+        where: {
+          user_id: user.id,
+          month,
+          year,
+        },
+      });
+
+      if (!existing) {
+        const created = await tx.allowances.create({
+          data: {
+            user_id: user.id,
+            month,
+            year,
+            amount: baseAmount,
+            remaining: baseAmount,
+            frequency,
+          },
+        });
+
+        return {
+          status: 200,
+          payload: serializeAllowance(created),
+        };
+      }
+
+      const incomeAggregate = await tx.additional_incomes.aggregate({
+        where: {
+          user_id: user.id,
+          allowance_id: existing.id,
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+
+      const expenseAggregate = await tx.expenses.aggregate({
+        where: {
+          user_id: user.id,
+          allowance_id: existing.id,
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+
+      const additionalIncomeTotal = incomeAggregate._sum.amount || 0;
+      const expenseTotal = expenseAggregate._sum.amount || 0;
+      const nextAmount = baseAmount + additionalIncomeTotal;
+      const nextRemaining = nextAmount - expenseTotal;
+
+      if (nextRemaining < 0) {
+        return {
+          status: 400,
+          payload: {
+            error: "Nominal uang saku terlalu kecil untuk pengeluaran yang sudah tercatat.",
+            minimumBaseAmount: Math.max(expenseTotal - additionalIncomeTotal, 1),
+            expenseTotal,
+            additionalIncomeTotal,
+          },
+        };
+      }
+
+      const updated = await tx.allowances.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          amount: nextAmount,
+          remaining: nextRemaining,
+          frequency,
+          updated_at: new Date(),
+        },
+      });
+
+      return {
+        status: 200,
+        payload: serializeAllowance(updated),
+      };
+    });
+
+    return new Response(JSON.stringify(result.payload), { status: result.status });
+  } catch (err) {
+    console.error("Allowances PUT error:", err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }

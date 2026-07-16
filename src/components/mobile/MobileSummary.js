@@ -2,20 +2,9 @@
 
 import { Legend, Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import MobileShell from "./MobileShell";
+import { getCategoryDotColor } from "@/lib/finance";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
-
-const getCategoryColor = (category) => {
-  const colors = {
-    Transportasi: "bg-blue-500",
-    Makanan: "bg-green-500",
-    Belanja: "bg-purple-500",
-    Hiburan: "bg-pink-500",
-    Kesehatan: "bg-red-500",
-    Lainnya: "bg-gray-500",
-  };
-  return colors[category] || "bg-gray-500";
-};
 
 const formatCurrency = (amount) => new Intl.NumberFormat("id-ID").format(amount || 0);
 
@@ -68,7 +57,7 @@ export default function MobileSummary({ monthlyData = [], selectedMonth, onMonth
               {currentMonthData.categories.map((cat, idx) => (
                 <div key={cat.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 ${getCategoryColor(cat.name)} rounded-full`} />
+                    <div className={`w-4 h-4 ${getCategoryDotColor(cat.name)} rounded-full`} />
                     <span className="text-white">{cat.name}</span>
                   </div>
                   <div className="text-right">
