@@ -40,6 +40,7 @@ ALTER TABLE "public"."additional_incomes" ENABLE ROW LEVEL SECURITY;
 
 -- Expenses policies
 DROP POLICY IF EXISTS "Users can view own expenses" ON "public"."expenses";
+DROP POLICY IF EXISTS "Users can only see their own expenses" ON "public"."expenses";
 CREATE POLICY "Users can view own expenses"
 ON "public"."expenses"
 FOR SELECT
@@ -47,6 +48,7 @@ TO authenticated
 USING ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can insert own expenses" ON "public"."expenses";
+DROP POLICY IF EXISTS "Users can insert their own expenses" ON "public"."expenses";
 CREATE POLICY "Users can insert own expenses"
 ON "public"."expenses"
 FOR INSERT
@@ -54,6 +56,7 @@ TO authenticated
 WITH CHECK ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can update own expenses" ON "public"."expenses";
+DROP POLICY IF EXISTS "allow update own expenses" ON "public"."expenses";
 CREATE POLICY "Users can update own expenses"
 ON "public"."expenses"
 FOR UPDATE
@@ -62,6 +65,7 @@ USING ((SELECT auth.uid()) = "user_id")
 WITH CHECK ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can delete own expenses" ON "public"."expenses";
+DROP POLICY IF EXISTS "Users can delete their own expenses" ON "public"."expenses";
 CREATE POLICY "Users can delete own expenses"
 ON "public"."expenses"
 FOR DELETE
@@ -70,6 +74,8 @@ USING ((SELECT auth.uid()) = "user_id");
 
 -- Allowances policies
 DROP POLICY IF EXISTS "Users can view own allowances" ON "public"."allowances";
+DROP POLICY IF EXISTS "Users can view their own allowances" ON "public"."allowances";
+DROP POLICY IF EXISTS "Users manage own allowances" ON "public"."allowances";
 CREATE POLICY "Users can view own allowances"
 ON "public"."allowances"
 FOR SELECT
@@ -77,6 +83,7 @@ TO authenticated
 USING ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can insert own allowances" ON "public"."allowances";
+DROP POLICY IF EXISTS "Users can insert their own allowances" ON "public"."allowances";
 CREATE POLICY "Users can insert own allowances"
 ON "public"."allowances"
 FOR INSERT
@@ -84,6 +91,7 @@ TO authenticated
 WITH CHECK ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can update own allowances" ON "public"."allowances";
+DROP POLICY IF EXISTS "Users can update their own allowances" ON "public"."allowances";
 CREATE POLICY "Users can update own allowances"
 ON "public"."allowances"
 FOR UPDATE
@@ -100,6 +108,8 @@ USING ((SELECT auth.uid()) = "user_id");
 
 -- Additional incomes policies
 DROP POLICY IF EXISTS "Users can view own additional incomes" ON "public"."additional_incomes";
+DROP POLICY IF EXISTS "Users can view their own additional incomes" ON "public"."additional_incomes";
+DROP POLICY IF EXISTS "Users manage own additional incomes" ON "public"."additional_incomes";
 CREATE POLICY "Users can view own additional incomes"
 ON "public"."additional_incomes"
 FOR SELECT
@@ -107,6 +117,7 @@ TO authenticated
 USING ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can insert own additional incomes" ON "public"."additional_incomes";
+DROP POLICY IF EXISTS "Users can insert their own additional incomes" ON "public"."additional_incomes";
 CREATE POLICY "Users can insert own additional incomes"
 ON "public"."additional_incomes"
 FOR INSERT
@@ -114,6 +125,7 @@ TO authenticated
 WITH CHECK ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can update own additional incomes" ON "public"."additional_incomes";
+DROP POLICY IF EXISTS "Users can update their own additional incomes" ON "public"."additional_incomes";
 CREATE POLICY "Users can update own additional incomes"
 ON "public"."additional_incomes"
 FOR UPDATE
@@ -122,6 +134,7 @@ USING ((SELECT auth.uid()) = "user_id")
 WITH CHECK ((SELECT auth.uid()) = "user_id");
 
 DROP POLICY IF EXISTS "Users can delete own additional incomes" ON "public"."additional_incomes";
+DROP POLICY IF EXISTS "Users can delete their own additional incomes" ON "public"."additional_incomes";
 CREATE POLICY "Users can delete own additional incomes"
 ON "public"."additional_incomes"
 FOR DELETE
