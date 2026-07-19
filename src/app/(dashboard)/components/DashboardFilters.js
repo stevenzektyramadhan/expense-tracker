@@ -1,30 +1,30 @@
 "use client";
-import { useEffect, useState } from "react";
 
-export default function DashboardFilters({ categories, initialFilters, onFilterChange }) {
-  const [month, setMonth] = useState(initialFilters?.month || "");
-  const [category, setCategory] = useState(initialFilters?.category || "");
-  const [search, setSearch] = useState(initialFilters?.search || "");
-  const [sort, setSort] = useState(initialFilters?.sort || "date-desc");
-
-  useEffect(() => {
-    setMonth(initialFilters?.month || "");
-    setCategory(initialFilters?.category || "");
-    setSearch(initialFilters?.search || "");
-    setSort(initialFilters?.sort || "date-desc");
-  }, [initialFilters]);
+export default function DashboardFilters({
+  categories,
+  filters,
+  currentYear,
+  onFilterChange,
+}) {
+  const month =
+    filters.period === "all"
+      ? ""
+      : String(filters.month).padStart(2, "0");
 
   const handleChange = (field, value) => {
-    if (field === "month") setMonth(value);
-    if (field === "category") setCategory(value);
-    if (field === "search") setSearch(value);
-    if (field === "sort") setSort(value);
+    if (field === "month") {
+      onFilterChange({
+        ...filters,
+        period: value ? "month" : "all",
+        month: value ? Number(value) : filters.month,
+        year: value ? currentYear : filters.year,
+      });
+      return;
+    }
 
     onFilterChange({
-      month: field === "month" ? value : month,
-      category: field === "category" ? value : category,
-      search: field === "search" ? value : search,
-      sort: field === "sort" ? value : sort,
+      ...filters,
+      [field]: value,
     });
   };
 
@@ -44,7 +44,7 @@ export default function DashboardFilters({ categories, initialFilters, onFilterC
       </select>
 
       {/* Filter Kategori */}
-      <select className="border px-2 py-1 rounded" value={category} onChange={(e) => handleChange("category", e.target.value)}>
+      <select className="border px-2 py-1 rounded" value={filters.category} onChange={(e) => handleChange("category", e.target.value)}>
         <option value="">Semua Kategori</option>
         {categories.map((c) => (
           <option key={c} value={c}>
@@ -54,10 +54,10 @@ export default function DashboardFilters({ categories, initialFilters, onFilterC
       </select>
 
       {/* Search */}
-      <input type="text" placeholder="Cari deskripsi..." className="border px-2 py-1 rounded flex-1" value={search} onChange={(e) => handleChange("search", e.target.value)} />
+      <input type="text" placeholder="Cari deskripsi..." className="border px-2 py-1 rounded flex-1" value={filters.search} onChange={(e) => handleChange("search", e.target.value)} />
 
       {/* Sort */}
-      <select className="border px-2 py-1 rounded" value={sort} onChange={(e) => handleChange("sort", e.target.value)}>
+      <select className="border px-2 py-1 rounded" value={filters.sort} onChange={(e) => handleChange("sort", e.target.value)}>
         <option value="date-desc">Tanggal terbaru</option>
         <option value="date-asc">Tanggal terlama</option>
         <option value="amount-desc">Jumlah terbesar</option>

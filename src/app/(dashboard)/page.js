@@ -1,11 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import { DEFAULT_EXPENSE_CATEGORIES, getExpensesForPeriod, getPeriodLabel } from "@/lib/finance";
+import { DEFAULT_EXPENSE_CATEGORIES, getPeriodLabel } from "@/lib/finance";
+import { formatCurrency } from "@/lib/utils";
+import useDashboardData from "@/features/dashboard/useDashboardData";
 
 // Components
 import SummaryCards from "./components/SummaryCards";
@@ -24,168 +26,67 @@ const MobileExpenseDetailSheet = dynamic(() => import("@/components/mobile/Mobil
   ssr: false,
 });
 
-const getCurrentMonthValue = () => {
-  return String(new Date().getMonth() + 1).padStart(2, "0");
-};
-
-const getCurrentYearValue = () => new Date().getFullYear();
-
 export default function DashboardPage() {
   const { user } = useAuth();
   const { isMobile, isReady } = useIsMobile();
-  const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [allowance, setAllowance] = useState(null);
-  const [additionalIncomes, setAdditionalIncomes] = useState([]);
+  const userId = user?.id || null;
+  const {
+    allowance,
+    expenses,
+    additionalIncomes,
+    filters,
+    updateFilters,
+    filteredExpenses,
+    availableExpensePeriods,
+    currentAllowancePeriod,
+    metrics,
+    requestState,
+    refreshAllowance,
+    refreshExpenses,
+    refreshIncomes,
+    removeExpense,
+    replaceExpense,
+  } = useDashboardData({ userId });
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
   const [zoomImage, setZoomImage] = useState(null);
-  const [filters, setFilters] = useState({
-    month: getCurrentMonthValue(),
-    category: "",
-    search: "",
-    sort: "date-desc",
-  });
   const [open, setOpen] = useState(false);
   const allowancePromptPeriodRef = useRef(null);
 
   // 🔹 Cek allowance bulan ini, kalau belum ada → buat
-  const loadAllowance = useCallback(
-    async ({ shouldPrompt = false } = {}) => {
-      if (!user) return;
-
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
-      const periodKey = `${year}-${month}`;
-      const sessionKey = `allowancePrompted:${user.id}:${periodKey}`;
-      const hasPromptedThisSession =
-        allowancePromptPeriodRef.current === periodKey ||
-        (typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "true");
-
-      const markPeriodHandled = () => {
-        allowancePromptPeriodRef.current = periodKey;
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem(sessionKey, "true");
-        }
-      };
-
-      let data = null;
-
-      try {
-        const response = await authenticatedFetch("/api/allowances");
-        data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(data?.error || "Failed to load allowance");
-        }
-      } catch (error) {
-        console.error("Failed to load allowance", error);
-        setAllowance(null);
-
-        if (shouldPrompt && !hasPromptedThisSession) {
-          setOpen(true);
-          markPeriodHandled();
-        }
-        return;
-      }
-
-      if (data) {
-        setAllowance({
-          ...data,
-          amount: Number(data.amount),
-          remaining: Number(data.remaining),
-        });
-        markPeriodHandled();
-        return;
-      }
-
-      setAllowance(null);
-
-      if (shouldPrompt && !hasPromptedThisSession) {
-        setOpen(true);
-        markPeriodHandled();
-      }
-    },
-    [user]
-  );
-
-  const loadExpenses = useCallback(async () => {
-    if (!user) return;
-
-    const queryOptions = {};
-
-    if (!isMobile && filters.month) {
-      const now = new Date();
-      const year = now.getFullYear();
-      const monthNumber = Number(filters.month);
-      const lastDay = new Date(year, monthNumber, 0).getDate();
-
-      queryOptions.startDate = `${year}-${String(monthNumber).padStart(2, "0")}-01`;
-      queryOptions.endDate = `${year}-${String(monthNumber).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    }
-
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (queryOptions.startDate) params.set("startDate", queryOptions.startDate);
-      if (queryOptions.endDate) params.set("endDate", queryOptions.endDate);
-
-      const url = params.toString() ? `/api/expenses?${params.toString()}` : "/api/expenses";
-      const response = await authenticatedFetch(url);
-      const data = await response.json().catch(() => []);
-
-      if (!response.ok) {
-        throw new Error(data.error || "Gagal memuat pengeluaran");
-      }
-
-      setError("");
-      setExpenses(data || []);
-    } catch (error) {
-      setError(error.message);
-    }
-    setLoading(false);
-  }, [user, isMobile, filters.month]);
-
-  const loadIncomes = useCallback(async () => {
-    if (!user) return;
-
-    const month = Number(filters.month || getCurrentMonthValue());
-    const year = getCurrentYearValue();
-
-    try {
-      const response = await authenticatedFetch(`/api/incomes?month=${month}&year=${year}`);
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Gagal memuat pendapatan tambahan");
-      }
-
-      setAdditionalIncomes(payload.data || []);
-    } catch (err) {
-      console.error("Failed to load incomes", err);
-      setAdditionalIncomes([]);
-    }
-  }, [user, filters.month]);
-
   useEffect(() => {
-    if (user) {
-      loadAllowance({ shouldPrompt: true });
-    }
-  }, [user, loadAllowance]);
+    const allowanceStatus = requestState.allowance.status;
 
-  useEffect(() => {
-    if (user) {
-      loadExpenses();
+    if (
+      !userId ||
+      allowanceStatus === "idle" ||
+      allowanceStatus === "loading" ||
+      allowanceStatus === "error"
+    ) {
+      return;
     }
-  }, [user, loadExpenses]);
 
-  useEffect(() => {
-    if (user) {
-      loadIncomes();
+    const periodKey = `${currentAllowancePeriod.year}-${currentAllowancePeriod.month}`;
+    const sessionKey = `allowancePrompted:${userId}:${periodKey}`;
+    const hasPromptedThisSession =
+      allowancePromptPeriodRef.current === periodKey ||
+      (typeof window !== "undefined" &&
+        sessionStorage.getItem(sessionKey) === "true");
+
+    if (allowanceStatus === "missing" && !hasPromptedThisSession) {
+      setOpen(true);
     }
-  }, [user, loadIncomes]);
+
+    allowancePromptPeriodRef.current = periodKey;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(sessionKey, "true");
+    }
+  }, [
+    currentAllowancePeriod.month,
+    currentAllowancePeriod.year,
+    requestState.allowance.status,
+    userId,
+  ]);
 
   const handleDelete = async (id) => {
     const { default: Swal } = await import("sweetalert2");
@@ -212,9 +113,9 @@ export default function DashboardPage() {
     });
 
     if (response.ok) {
-      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      removeExpense(id);
       setSelectedExpense(null);
-      loadAllowance();
+      refreshAllowance();
 
       Swal.fire("Terhapus!", "Pengeluaran berhasil dihapus.", "success");
     } else {
@@ -225,79 +126,49 @@ export default function DashboardPage() {
   };
 
   const handleUpdate = (updatedExpense) => {
-    setExpenses((prev) => prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e)));
-    loadAllowance();
+    replaceExpense(updatedExpense);
+    refreshAllowance();
   };
 
   // Get current frequency from allowance (default to 'monthly')
   const currentFrequency = allowance?.frequency || "monthly";
   const periodLabel = getPeriodLabel(currentFrequency);
-
-  // Calculate total expenses for the current period
-  const periodExpenses = useMemo(
-    () => getExpensesForPeriod(expenses, currentFrequency),
-    [expenses, currentFrequency]
-  );
-  const totalPeriodExpenses = useMemo(
-    () => periodExpenses.reduce((sum, e) => sum + e.amount, 0),
-    [periodExpenses]
-  );
-
-  const filteredExpenses = useMemo(() => {
-    let filtered = [...expenses];
-
-    // Filter bulan
-    if (filters.month) {
-      filtered = filtered.filter((e) => {
-        const d = new Date(e.date);
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        return m === filters.month;
-      });
-    }
-
-    // Filter kategori
-    if (filters.category) {
-      filtered = filtered.filter((e) => e.category === filters.category);
-    }
-
-    // Search
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      filtered = filtered.filter((e) => e.description?.toLowerCase().includes(q) || e.category.toLowerCase().includes(q));
-    }
-
-    // Sort
-    if (filters.sort === "date-desc") {
-      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-    } else if (filters.sort === "date-asc") {
-      filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
-    } else if (filters.sort === "amount-desc") {
-      filtered.sort((a, b) => b.amount - a.amount);
-    } else if (filters.sort === "amount-asc") {
-      filtered.sort((a, b) => a.amount - b.amount);
-    }
-
-    return filtered;
-  }, [expenses, filters]);
-
-  const totalExpenses = useMemo(
-    () => filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
-    [filteredExpenses]
-  );
-
-  const totalAdditionalIncome = useMemo(
-    () => additionalIncomes.reduce((sum, income) => sum + income.amount, 0),
-    [additionalIncomes]
-  );
-
-  const baseAllowance = useMemo(() => {
-    if (!allowance) return 0;
-    return Math.max(Number(allowance.amount) - totalAdditionalIncome, 0);
-  }, [allowance, totalAdditionalIncome]);
+  const totalPeriodExpenses = metrics.currentAllowancePeriodSpending;
+  const totalExpenses = metrics.filteredExpenseTotal;
+  const totalAdditionalIncome =
+    metrics.currentAllowancePeriodAdditionalIncome;
+  const baseAllowance = metrics.baseAllowanceDisplay;
+  const requestErrors = [
+    {
+      key: "allowance",
+      message: requestState.allowance.error,
+      retry: refreshAllowance,
+    },
+    {
+      key: "expenses",
+      message: requestState.expenses.error,
+      retry: refreshExpenses,
+    },
+    {
+      key: "incomes",
+      message: requestState.incomes.error,
+      retry: refreshIncomes,
+    },
+  ].filter((requestError) => requestError.message);
+  const formatMetricCurrency = (value) =>
+    value === null ? "-" : formatCurrency(value);
+  const retryFailedRequests = () => {
+    return Promise.all(requestErrors.map((requestError) => requestError.retry()));
+  };
 
   if (!isReady) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
 
-  if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
+  if (
+    requestState.expenses.status === "idle" ||
+    (requestState.expenses.status === "loading" && !Array.isArray(expenses))
+  ) {
+    return <div className="flex items-center justify-center min-h-64">Loading...</div>;
+  }
   
   return (
     <>
@@ -318,7 +189,7 @@ export default function DashboardPage() {
         <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg flex items-center justify-between gap-3">
           <div>
             <p className="text-sm text-emerald-700">Pendapatan tambahan bulan ini</p>
-            <p className="text-xl font-bold text-emerald-800">Rp {totalAdditionalIncome.toLocaleString()}</p>
+            <p className="text-xl font-bold text-emerald-800">{formatMetricCurrency(totalAdditionalIncome)}</p>
           </div>
           <Link href="/income" className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-700">
             Lihat Riwayat
@@ -331,15 +202,15 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold text-gray-700">
               Sisa Uang Saku {periodLabel}
             </h2>
-            <p className="mt-2 text-2xl font-bold text-gray-900">Rp {allowance.remaining.toLocaleString()}</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900">{formatCurrency(allowance.remaining)}</p>
             <p className="text-sm text-gray-500">
-              Dari Rp {allowance.amount.toLocaleString()} ({currentFrequency === "weekly" ? "Mingguan" : "Bulanan"})
+              Dari {formatCurrency(allowance.amount)} ({currentFrequency === "weekly" ? "Mingguan" : "Bulanan"})
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              Uang saku awal: Rp {baseAllowance.toLocaleString()} | Pendapatan tambahan: Rp {totalAdditionalIncome.toLocaleString()}
+              Uang saku awal: {formatMetricCurrency(baseAllowance)} | Pendapatan tambahan: {formatMetricCurrency(totalAdditionalIncome)}
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              Total Pengeluaran {periodLabel}: Rp {totalPeriodExpenses.toLocaleString()}
+              Total Pengeluaran {periodLabel}: {formatMetricCurrency(totalPeriodExpenses)}
             </p>
             <div className="mt-3 flex gap-2">
               <button className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700" onClick={() => setOpen(true)}>
@@ -352,17 +223,40 @@ export default function DashboardPage() {
           </div>
         )}
         {/* Summary Cards */}
-        <SummaryCards totalExpenses={totalExpenses} totalTransactions={filteredExpenses.length} allowanceTotal={allowance?.total || 0} allowanceRemaining={allowance?.remaining || 0} />
+        {requestState.expenses.status === "success" && (
+          <SummaryCards
+            totalExpenses={totalExpenses}
+            totalTransactions={metrics.filteredTransactionCount}
+            allowanceTotal={allowance?.total || 0}
+            allowanceRemaining={allowance?.remaining || 0}
+          />
+        )}
 
         {/* Error */}
-        {error && (
+        {requestErrors.length > 0 && (
           <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
+            {requestErrors.map((requestError) => (
+              <div key={requestError.key} className="text-sm text-red-700">
+                {requestError.message}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={retryFailedRequests}
+              className="mt-2 text-sm font-medium text-red-700 underline"
+            >
+              Coba lagi
+            </button>
           </div>
         )}
 
         {/* Filter Bar */}
-        <DashboardFilters categories={DEFAULT_EXPENSE_CATEGORIES} initialFilters={filters} onFilterChange={setFilters} />
+        <DashboardFilters
+          categories={DEFAULT_EXPENSE_CATEGORIES}
+          filters={filters}
+          currentYear={currentAllowancePeriod.year}
+          onFilterChange={updateFilters}
+        />
         {/* List */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
@@ -370,7 +264,13 @@ export default function DashboardPage() {
             <p className="mt-1 max-w-2xl text-sm text-gray-500">Pengeluaran terbaru Anda</p>
           </div>
           <div className="border-t border-gray-200">
-            {filteredExpenses.length === 0 ? (
+            {requestState.expenses.status === "loading" ? (
+              <div className="text-center py-12 text-gray-500">Loading...</div>
+            ) : requestState.expenses.status === "error" ? (
+              <div className="text-center py-12 text-gray-500">
+                Data pengeluaran tidak tersedia.
+              </div>
+            ) : filteredExpenses.length === 0 ? (
               <div className="text-center py-12 text-gray-500">Belum ada pengeluaran</div>
             ) : (
               <ul className="divide-y divide-gray-200">
@@ -387,8 +287,17 @@ export default function DashboardPage() {
         <MobileDashboard
           user={user}
           expenses={expenses}
+          filteredExpenses={filteredExpenses}
           additionalIncomes={additionalIncomes}
           allowance={allowance}
+          filters={filters}
+          availableExpensePeriods={availableExpensePeriods}
+          metrics={metrics}
+          requestState={requestState}
+          onFilterChange={updateFilters}
+          onRetryAllowance={refreshAllowance}
+          onRetryExpenses={refreshExpenses}
+          onRetryIncomes={refreshIncomes}
           onSelectExpense={setSelectedExpense}
           onEditBudget={() => setOpen(true)}
         />
@@ -427,9 +336,9 @@ export default function DashboardPage() {
         onClose={() => setOpen(false)}
         onSaved={() => {
           setOpen(false);
-          loadAllowance?.(); // refresh data di parent
+          refreshAllowance(); // refresh data di parent
         }}
-        initialAmount={allowance ? baseAllowance : 0}
+        initialAmount={allowance && baseAllowance !== null ? baseAllowance : 0}
         initialFrequency={allowance?.frequency || "monthly"}
       />
     </>

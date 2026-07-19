@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, Search } from "./icons";
@@ -8,30 +8,42 @@ import { Pencil } from "lucide-react";
 import MobileShell from "./MobileShell";
 import Swal from "sweetalert2";
 import { supabase } from "@/lib/supabaseClient";
-import { DEFAULT_EXPENSE_CATEGORIES, getCategoryDotColor, getExpensesForPeriod } from "@/lib/finance";
+import { DEFAULT_EXPENSE_CATEGORIES, getCategoryDotColor } from "@/lib/finance";
+import { formatCurrency } from "@/lib/utils";
 
-const formatCurrency = (amount = 0) => new Intl.NumberFormat("id-ID").format(amount);
+const formatMetricCurrency = (amount) =>
+  amount === null ? "-" : formatCurrency(amount);
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 };
 
-const getMonthName = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+const getPeriodName = ({ month, year }) => {
+  return new Date(year, month - 1, 1).toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
 };
 
-const getCurrentMonthName = () => {
-  return new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-};
-
-export default function MobileDashboard({ user, expenses = [], additionalIncomes = [], allowance, onSelectExpense = () => {}, onEditBudget = () => {} }) {
+export default function MobileDashboard({
+  user,
+  expenses,
+  filteredExpenses,
+  additionalIncomes,
+  allowance,
+  filters,
+  availableExpensePeriods,
+  metrics,
+  requestState,
+  onFilterChange,
+  onRetryAllowance = () => {},
+  onRetryExpenses = () => {},
+  onRetryIncomes = () => {},
+  onSelectExpense = () => {},
+  onEditBudget = () => {},
+}) {
   const router = useRouter();
-  const [filterMonth, setFilterMonth] = useState(getCurrentMonthName);
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [searchDesc, setSearchDesc] = useState("");
-  const [sortOrder, setSortOrder] = useState("newest");
 
   // =============================================================================
   // MISSING INFORMATION DETECTOR
@@ -105,75 +117,55 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
     promptForName();
   }, [user, router]); // Re-run when auth user or router instance changes
 
-
-  const uniqueMonths = useMemo(() => {
-    const months = [...new Set(expenses.map((e) => getMonthName(e.date)))];
-    const currentMonth = getCurrentMonthName();
-
-    if (!months.includes(currentMonth)) {
-      months.unshift(currentMonth);
-    }
-
-    return months;
-  }, [expenses]);
-  const categories = useMemo(() => {
-    const unique = new Set(expenses.map((e) => e.category));
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safeAdditionalIncomes = Array.isArray(additionalIncomes)
+    ? additionalIncomes
+    : [];
+  const selectedPeriod =
+    filters.period === "all"
+      ? "all"
+      : `${filters.year}-${String(filters.month).padStart(2, "0")}`;
+  const categories = (() => {
+    const unique = new Set(safeExpenses.map((e) => e.category));
     return unique.size ? Array.from(unique) : DEFAULT_EXPENSE_CATEGORIES;
-  }, [expenses]);
-
-  const filteredExpenses = useMemo(() => {
-    let filtered = [...expenses];
-
-    if (filterMonth !== "all") {
-      filtered = filtered.filter((e) => getMonthName(e.date) === filterMonth);
-    }
-
-    if (filterCategory !== "all") {
-      filtered = filtered.filter((e) => e.category === filterCategory);
-    }
-
-    if (searchDesc) {
-      filtered = filtered.filter((e) => e.description?.toLowerCase().includes(searchDesc.toLowerCase()));
-    }
-
-    filtered.sort((a, b) => {
-      if (sortOrder === "newest") return new Date(b.date) - new Date(a.date);
-      return new Date(a.date) - new Date(b.date);
-    });
-
-    return filtered;
-  }, [expenses, filterCategory, filterMonth, searchDesc, sortOrder]);
+  })();
+  const latestIncomes = safeAdditionalIncomes.slice(0, 3);
 
   // Get the current budget frequency (default to 'monthly')
   const currentFrequency = allowance?.frequency || "monthly";
+  const totalExpense = metrics.currentAllowancePeriodSpending;
+  const totalAdditionalIncome =
+    metrics.currentAllowancePeriodAdditionalIncome;
+  const baseBudget = metrics.baseAllowanceDisplay;
+  const avgPerTransaction = metrics.currentAllowancePeriodAverageTransaction;
+  const totalTransactions = metrics.currentAllowancePeriodTransactionCount;
+  const remainingBudget =
+    requestState.allowance.status === "success"
+      ? Number(allowance.remaining)
+      : requestState.allowance.status === "missing"
+        ? 0
+        : null;
+  const sortLabel = {
+    "date-desc": "Latest",
+    "date-asc": "Oldest",
+    "amount-desc": "Jumlah terbesar",
+    "amount-asc": "Jumlah terkecil",
+  }[filters.sort];
 
-  // Calculate total expenses for the current period (week or month)
-  const periodExpenses = useMemo(
-    () => getExpensesForPeriod(expenses, currentFrequency),
-    [expenses, currentFrequency]
-  );
+  const handlePeriodChange = (value) => {
+    if (value === "all") {
+      onFilterChange({ ...filters, period: "all" });
+      return;
+    }
 
-  const totalExpense = useMemo(
-    () => periodExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
-    [periodExpenses]
-  );
-
-  const totalAdditionalIncome = useMemo(
-    () => additionalIncomes.reduce((sum, income) => sum + (income.amount || 0), 0),
-    [additionalIncomes]
-  );
-
-  const latestIncomes = useMemo(() => additionalIncomes.slice(0, 3), [additionalIncomes]);
-
-  const baseBudget = useMemo(() => {
-    if (!allowance) return 0;
-    return Math.max(Number(allowance.amount) - totalAdditionalIncome, 0);
-  }, [allowance, totalAdditionalIncome]);
-
-  // Calculate average using period-filtered expenses (not user search filter)
-  const avgPerTransaction = periodExpenses.length > 0 ? totalExpense / periodExpenses.length : 0;
-  const budget = allowance?.amount || 0;
-  const remainingBudget = allowance?.remaining ?? budget - totalExpense;
+    const [year, month] = value.split("-").map(Number);
+    onFilterChange({
+      ...filters,
+      period: "month",
+      month,
+      year,
+    });
+  };
 
   return (
     <MobileShell>
@@ -220,8 +212,17 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
           <p className="text-white text-sm mb-2 opacity-90">
             Balance {currentFrequency === 'weekly' ? '(Mingguan)' : '(Bulanan)'}
           </p>
-          <h2 className="text-4xl font-bold text-white">Rp {formatCurrency(remainingBudget)}</h2>
-          <p className="text-white text-xs mt-2 opacity-80">Budget awal Rp {formatCurrency(baseBudget)} + tambahan Rp {formatCurrency(totalAdditionalIncome)}</p>
+          <h2 className="text-4xl font-bold text-white">{formatMetricCurrency(remainingBudget)}</h2>
+          <p className="text-white text-xs mt-2 opacity-80">Budget awal {formatMetricCurrency(baseBudget)} + tambahan {formatMetricCurrency(totalAdditionalIncome)}</p>
+          {requestState.allowance.status === "error" && (
+            <button
+              type="button"
+              onClick={onRetryAllowance}
+              className="mt-2 text-xs text-white underline"
+            >
+              Gagal memuat uang saku. Coba lagi
+            </button>
+          )}
         </div>
 
         <div className="bg-gradient-to-r from-emerald-600 to-green-500 rounded-3xl p-5 mb-6">
@@ -229,7 +230,7 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
             <p className="text-white text-sm opacity-90">Pendapatan Tambahan</p>
             <Link href="/income" className="text-xs bg-white/20 px-2 py-1 rounded-lg">Lihat</Link>
           </div>
-          <h3 className="text-2xl font-bold text-white">Rp {formatCurrency(totalAdditionalIncome)}</h3>
+          <h3 className="text-2xl font-bold text-white">{formatMetricCurrency(totalAdditionalIncome)}</h3>
           <Link href="/income/add" className="inline-block mt-3 text-xs bg-white/20 px-3 py-1.5 rounded-lg">
             + Tambah Pendapatan
           </Link>
@@ -237,17 +238,17 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
 
         <div className="bg-gradient-to-r from-blue-700 to-blue-900 rounded-3xl p-6 mb-6">
           <p className="text-white text-sm mb-2 opacity-90">Total Pengeluaran</p>
-          <h3 className="text-2xl font-bold text-white">Rp {formatCurrency(totalExpense)}</h3>
+          <h3 className="text-2xl font-bold text-white">{formatMetricCurrency(totalExpense)}</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-blue-600 rounded-2xl p-4">
             <p className="text-white text-xs mb-1 opacity-90">Total Transaksi</p>
-            <p className="text-2xl font-bold text-white">{periodExpenses.length}</p>
+            <p className="text-2xl font-bold text-white">{totalTransactions ?? "-"}</p>
           </div>
           <div className="bg-orange-500 rounded-2xl p-4">
             <p className="text-white text-xs mb-1 opacity-90">Rata-rata Transaksi</p>
-            <p className="text-lg font-bold text-white">Rp {formatCurrency(Math.round(avgPerTransaction))}</p>
+            <p className="text-lg font-bold text-white">{formatMetricCurrency(avgPerTransaction === null ? null : Math.round(avgPerTransaction))}</p>
           </div>
         </div>
 
@@ -256,8 +257,8 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
             <Search className="w-5 h-5 text-gray-400 mr-2" />
             <input
               type="text"
-              value={searchDesc}
-              onChange={(e) => setSearchDesc(e.target.value)}
+              value={filters.search}
+              onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
               placeholder="Search here"
               className="bg-transparent text-white outline-none w-full text-sm placeholder-gray-500"
             />
@@ -269,21 +270,21 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
 
         <div className="space-y-3 mb-6">
           <select
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
+            value={selectedPeriod}
+            onChange={(e) => handlePeriodChange(e.target.value)}
             className="w-full bg-gray-800 rounded-xl px-4 py-3 text-white outline-none"
           >
             <option value="all">Semua Bulan</option>
-            {uniqueMonths.map((month) => (
-              <option key={month} value={month}>
-                {month}
+            {availableExpensePeriods.map((period) => (
+              <option key={period.key} value={period.key}>
+                {getPeriodName(period)}
               </option>
             ))}
           </select>
 
           <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            value={filters.category || "all"}
+            onChange={(e) => onFilterChange({ ...filters, category: e.target.value })}
             className="w-full bg-gray-800 rounded-xl px-4 py-3 text-white outline-none"
           >
             <option value="all">Semua Kategori</option>
@@ -295,12 +296,18 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
           </select>
 
           <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
+            value={filters.sort}
+            onChange={(e) => onFilterChange({ ...filters, sort: e.target.value })}
             className="w-full bg-gray-800 rounded-xl px-4 py-3 text-white outline-none"
           >
-            <option value="newest">Tanggal terbaru</option>
-            <option value="oldest">Tanggal terlama</option>
+            <option value="date-desc">Tanggal terbaru</option>
+            <option value="date-asc">Tanggal terlama</option>
+            {filters.sort === "amount-desc" && (
+              <option value="amount-desc">Jumlah terbesar</option>
+            )}
+            {filters.sort === "amount-asc" && (
+              <option value="amount-asc">Jumlah terkecil</option>
+            )}
           </select>
         </div>
 
@@ -308,12 +315,27 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold">Transactions</h3>
             <span className="text-orange-400 text-sm flex items-center">
-              Sort by: {sortOrder === "newest" ? "Latest" : "Oldest"} <ChevronDown className="w-4 h-4 ml-1" />
+              Sort by: {sortLabel} <ChevronDown className="w-4 h-4 ml-1" />
             </span>
           </div>
 
           <div className="space-y-3">
-            {filteredExpenses.map((expense) => (
+            {requestState.expenses.status === "loading" ? (
+              <div className="text-center text-gray-400 py-8">Loading...</div>
+            ) : requestState.expenses.status === "error" ? (
+              <div className="text-center text-gray-400 py-8">
+                <p>Gagal memuat pengeluaran.</p>
+                <button
+                  type="button"
+                  onClick={onRetryExpenses}
+                  className="mt-2 text-sm text-orange-400 underline"
+                >
+                  Coba lagi
+                </button>
+              </div>
+            ) : (
+              <>
+              {filteredExpenses.map((expense) => (
               <button
                 key={expense.id}
                 type="button"
@@ -331,13 +353,15 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-white">{expense.category}</p>
-                  <p className="text-green-400 text-xs">Rp {formatCurrency(expense.amount)}</p>
+                  <p className="text-green-400 text-xs">{formatCurrency(expense.amount)}</p>
                 </div>
               </button>
             ))}
 
             {filteredExpenses.length === 0 && (
               <div className="text-center text-gray-400 py-8">Belum ada pengeluaran untuk filter ini.</div>
+            )}
+              </>
             )}
           </div>
         </div>
@@ -349,18 +373,37 @@ export default function MobileDashboard({ user, expenses = [], additionalIncomes
           </div>
 
           <div className="space-y-3">
-            {latestIncomes.map((income) => (
+            {requestState.incomes.status === "loading" ? (
+              <div className="text-center text-gray-400 py-6 bg-gray-800 rounded-2xl">
+                Loading...
+              </div>
+            ) : requestState.incomes.status === "error" ? (
+              <div className="text-center text-gray-400 py-6 bg-gray-800 rounded-2xl">
+                <p>Gagal memuat pendapatan tambahan.</p>
+                <button
+                  type="button"
+                  onClick={onRetryIncomes}
+                  className="mt-2 text-sm text-emerald-400 underline"
+                >
+                  Coba lagi
+                </button>
+              </div>
+            ) : (
+              <>
+              {latestIncomes.map((income) => (
               <div key={income.id} className="bg-gray-800 rounded-2xl p-4 w-full flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-white">{income.source || "Pendapatan tambahan"}</p>
                   <p className="text-gray-400 text-xs">{formatDate(income.date)}</p>
                 </div>
-                <p className="text-emerald-400 font-semibold">Rp {formatCurrency(income.amount)}</p>
+                <p className="text-emerald-400 font-semibold">{formatCurrency(income.amount)}</p>
               </div>
             ))}
 
             {latestIncomes.length === 0 && (
               <div className="text-center text-gray-400 py-6 bg-gray-800 rounded-2xl">Belum ada pendapatan tambahan.</div>
+            )}
+              </>
             )}
           </div>
         </div>
