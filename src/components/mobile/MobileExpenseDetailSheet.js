@@ -1,125 +1,206 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Maximize2, X } from "lucide-react";
 
-export default function MobileExpenseDetailSheet({ expense, onClose, onEdit, onDelete, onZoom }) {
+import CurrencyAmount from "@/components/finance/CurrencyAmount";
+import Button from "@/components/ui/Button";
+import { formatDate } from "@/lib/utils";
+
+const wrappingAmountStyle = {
+  overflowWrap: "anywhere",
+  whiteSpace: "normal",
+};
+
+const fallbackLabels = {
+  title: "Detail pengeluaran",
+  description: "Deskripsi",
+  category: "Kategori",
+  date: "Tanggal",
+  amount: "Jumlah",
+  receipt: "Struk",
+  noDescription: "Tanpa deskripsi",
+  noReceipt: "Tidak ada foto struk",
+  zoom: "Perbesar struk",
+  edit: "Edit",
+  delete: "Hapus",
+  close: "Tutup",
+};
+
+export default function MobileExpenseDetailSheet({
+  expense,
+  labels = fallbackLabels,
+  onClose,
+  onEdit,
+  onDelete,
+  onZoom,
+}) {
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const copy = { ...fallbackLabels, ...labels };
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+
+    if (!dialog.open) dialog.showModal();
+    closeButtonRef.current?.focus();
+
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
   if (!expense) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:hidden"
-      role="dialog"
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-x-0 bottom-0 top-auto z-[var(--z-modal)] m-0 w-full max-w-none overflow-visible border-0 bg-transparent p-0 text-[var(--color-text)] backdrop:bg-[var(--color-text)]/60"
       aria-labelledby="mobile-expense-detail-title"
-      aria-modal="true"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <div
-        className="flex w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-gray-900 text-white shadow-2xl"
+      <article
+        className="mx-auto flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-t-[var(--radius-prominent)] border border-b-0 border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--elevation-2)]"
         style={{
           maxHeight:
             "calc(100dvh - env(safe-area-inset-top, 0px) - var(--space-sm))",
         }}
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 px-6 pb-4 pt-6">
-          <div className="min-w-0">
-            <p className="text-xs text-gray-400">Detail Pengeluaran</p>
-            <h2
-              id="mobile-expense-detail-title"
-              className="mt-1 max-h-32 overflow-y-auto overscroll-contain break-words pr-1 text-lg font-bold"
-            >
-              {expense.description || "Tidak ada deskripsi"}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="-mr-3 -mt-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 active:bg-gray-700"
-            aria-label="Tutup detail pengeluaran"
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4">
+          <h2
+            id="mobile-expense-detail-title"
+            className="font-[family-name:var(--font-display-family)] text-lg font-bold"
           >
-            ✕
-          </button>
-        </div>
+            {copy.title}
+          </h2>
+          <Button
+            ref={closeButtonRef}
+            size="icon"
+            variant="quiet"
+            onClick={onClose}
+            aria-label={copy.close}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </Button>
+        </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-5">
-          <div className="mb-5 space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <span className="shrink-0 text-sm text-gray-400">Kategori</span>
-              <span className="min-w-0 break-words text-right text-sm font-semibold">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+          <dl className="grid min-w-0 gap-4">
+            <div className="min-w-0">
+              <dt className="text-sm font-medium text-[var(--color-text-muted)]">
+                {copy.description}
+              </dt>
+              <dd className="mt-1 break-words font-semibold">
+                {expense.description?.trim() || copy.noDescription}
+              </dd>
+            </div>
+            <div className="flex min-w-0 items-start justify-between gap-4">
+              <dt className="shrink-0 text-sm font-medium text-[var(--color-text-muted)]">
+                {copy.category}
+              </dt>
+              <dd className="min-w-0 break-words text-right font-semibold">
                 {expense.category}
-              </span>
+              </dd>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="shrink-0 text-sm text-gray-400">Tanggal</span>
-              <span className="min-w-0 break-words text-right text-sm font-semibold">
-                {formatDate(expense.date)}
-              </span>
+            <div className="flex min-w-0 items-start justify-between gap-4">
+              <dt className="shrink-0 text-sm font-medium text-[var(--color-text-muted)]">
+                {copy.date}
+              </dt>
+              <dd className="text-right font-semibold">
+                <time dateTime={expense.date}>{formatDate(expense.date)}</time>
+              </dd>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="shrink-0 text-sm text-gray-400">Jumlah</span>
-              <span className="min-w-0 break-words text-right text-lg font-bold text-purple-300 [font-variant-numeric:tabular-nums]">
-                {formatCurrency(expense.amount)}
-              </span>
+            <div className="flex min-w-0 items-start justify-between gap-4">
+              <dt className="shrink-0 text-sm font-medium text-[var(--color-text-muted)]">
+                {copy.amount}
+              </dt>
+              <dd className="min-w-0 break-words text-right">
+                <CurrencyAmount
+                  amount={expense.amount}
+                  tone="expense"
+                  showSign
+                  className="text-xl font-bold"
+                  style={wrappingAmountStyle}
+                />
+              </dd>
             </div>
-          </div>
+          </dl>
 
-          <div>
-            <p className="mb-2 text-sm text-gray-400">Struk</p>
+          <div className="mt-6">
+            <p className="mb-2 text-sm font-medium text-[var(--color-text-muted)]">
+              {copy.receipt}
+            </p>
             {expense.receipt_url ? (
               <button
                 type="button"
                 onClick={() => onZoom?.(expense.receipt_url)}
-                className="relative block min-h-11 w-full overflow-hidden rounded-2xl border border-gray-800 bg-gray-800 hover:border-purple-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                className="group relative block min-h-44 w-full overflow-hidden rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] outline-none hover:border-[var(--color-primary-strong)] focus-visible:outline-[var(--focus-ring-width)] focus-visible:outline-offset-[var(--focus-ring-offset)] focus-visible:outline-[var(--color-focus)] active:bg-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-55"
+                aria-label={copy.zoom}
               >
-                <div className="relative h-44 w-full">
+                <span className="relative block h-48 w-full">
                   <Image
                     src={expense.receipt_url}
-                    alt="Bukti Struk"
+                    alt="Bukti struk pengeluaran"
                     fill
-                    sizes="320px"
-                    className="object-cover"
+                    sizes="(max-width: 448px) 100vw, 448px"
+                    className="object-contain"
                   />
-                </div>
-                <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-1 text-xs text-white">
-                  Perbesar
+                </span>
+                <span className="absolute bottom-3 right-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-text)] px-4 text-sm font-semibold text-[var(--color-surface)]">
+                  <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                  {copy.zoom}
                 </span>
               </button>
             ) : (
-              <div className="rounded-2xl border border-dashed border-gray-700 bg-gray-800 px-4 py-6 text-center text-sm text-gray-400">
-                Tidak ada foto struk
+              <div className="rounded-[var(--radius-surface)] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
+                {copy.noReceipt}
               </div>
             )}
           </div>
         </div>
 
-        <div
-          className="shrink-0 bg-gray-900 px-6 pt-4"
+        <footer
+          className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 pt-4"
           style={{
             paddingBottom:
-              "calc(var(--space-xl) + env(safe-area-inset-bottom, 0px))",
+              "calc(var(--space-lg) + env(safe-area-inset-bottom, 0px))",
           }}
         >
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {onEdit ? (
-              <button
-                type="button"
-                onClick={() => onEdit(expense)}
-                className="min-h-11 flex-1 whitespace-nowrap rounded-2xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 active:bg-purple-700"
-              >
-                Edit
-              </button>
+              <Button fullWidth variant="secondary" onClick={() => onEdit(expense)}>
+                {copy.edit}
+              </Button>
             ) : null}
             {onDelete ? (
-              <button
-                type="button"
+              <Button
+                fullWidth
+                variant="destructive"
                 onClick={() => onDelete(expense.id)}
-                className="min-h-11 flex-1 whitespace-nowrap rounded-2xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 active:bg-red-700"
               >
-                Hapus
-              </button>
+                {copy.delete}
+              </Button>
             ) : null}
+            <Button
+              className="col-span-2"
+              fullWidth
+              variant="quiet"
+              onClick={onClose}
+            >
+              {copy.close}
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </footer>
+      </article>
+    </dialog>
   );
 }
