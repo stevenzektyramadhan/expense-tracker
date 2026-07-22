@@ -1,266 +1,202 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { useAuth } from "@/hooks/useAuth";
-import { useIsMobile } from "@/hooks/useIsMobile";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { BarChart3, PlusCircle } from "lucide-react";
+
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import ErrorState from "@/components/ui/ErrorState";
+import MonthlySummary, {
+  MonthlySummarySkeleton,
+} from "@/features/reports/MonthlySummary";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 
-const PieChart = dynamic(() => import("recharts").then((mod) => mod.PieChart), { ssr: false });
-const Pie = dynamic(() => import("recharts").then((mod) => mod.Pie), { ssr: false });
-const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
-const ResponsiveContainer = dynamic(() => import("recharts").then((mod) => mod.ResponsiveContainer), { ssr: false });
-const Legend = dynamic(() => import("recharts").then((mod) => mod.Legend), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then((mod) => mod.Tooltip), { ssr: false });
-const MobileSummary = dynamic(() => import("@/components/mobile/MobileSummary"), { ssr: false });
+const SUMMARY_LOAD_ERROR =
+  "Ringkasan belum dapat dimuat. Periksa koneksi lalu coba lagi.";
+const SUMMARY_AUTH_ERROR =
+  "Sesi Anda berakhir. Masuk kembali lalu coba lagi.";
+
+const getExistingCurrentMonthKey = () =>
+  new Date().toISOString().slice(0, 7);
+
+function getSafeSummaryError({ message = "", status }) {
+  if (
+    status === 401 ||
+    /sesi login|sesi anda berakhir|login ulang|unauthorized|jwt|token/i.test(
+      message,
+    )
+  ) {
+    return SUMMARY_AUTH_ERROR;
+  }
+
+  return SUMMARY_LOAD_ERROR;
+}
+
+function normalizeSummaryPayload(payload) {
+  if (
+    !Array.isArray(payload?.expensesByMonth) ||
+    !payload?.categoryByMonth ||
+    typeof payload.categoryByMonth !== "object" ||
+    Array.isArray(payload.categoryByMonth)
+  ) {
+    throw new Error(SUMMARY_LOAD_ERROR);
+  }
+
+  return {
+    monthlyData: payload.expensesByMonth,
+    categoryByMonth: payload.categoryByMonth,
+  };
+}
+
+function resolveSelectedMonth(monthlyData, currentSelection = "") {
+  if (monthlyData.some((month) => month.key === currentSelection)) {
+    return currentSelection;
+  }
+
+  const currentMonthKey = getExistingCurrentMonthKey();
+  if (monthlyData.some((month) => month.key === currentMonthKey)) {
+    return currentMonthKey;
+  }
+
+  return monthlyData[0]?.key || "";
+}
 
 export default function SummaryPage() {
-  const { user, loading } = useAuth();
-  const { isMobile, isReady } = useIsMobile();
-  const router = useRouter();
-
-  const [monthlyData, setMonthlyData] = useState([]);
-  const [currentMonthData, setCurrentMonthData] = useState({
-    total: 0,
-    categories: [],
-    chartData: [],
-  });
+  const [summaryData, setSummaryData] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState("");
-  const [loadingData, setLoadingData] = useState(true);
-  
-  // ✅ Store category data per month (from API)
-  const [categoryByMonth, setCategoryByMonth] = useState({});
+  const [loadState, setLoadState] = useState({
+    status: "loading",
+    message: "",
+  });
+  const activeRequestRef = useRef(null);
 
-  // Colors for pie chart
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
-
-  // ✅ Updated to work with pre-aggregated data from API
-  const updateCurrentMonthData = useCallback((monthKey, categoryData, monthTotal) => {
-    // Calculate percentages for each category
-    const categories = categoryData.map((cat) => ({
-      name: cat.name,
-      amount: cat.amount,
-      percentage: monthTotal > 0 ? ((cat.amount / monthTotal) * 100).toFixed(1) : 0,
-    }));
-
-    // Format data for pie chart
-    const chartData = categories.map((cat) => ({
-      name: cat.name,
-      value: cat.amount,
-    }));
-
-    setCurrentMonthData({
-      total: monthTotal,
-      categories,
-      chartData,
-    });
-  }, []);
-
-  // ✅ Refactored to use the new /api/summary endpoint
-  // This is MUCH more efficient because:
-  // 1. Database does all the grouping and summing (not JavaScript)
-  // 2. Only aggregated results are sent over the network (tiny payload)
-  // 3. No memory overhead from loading thousands of raw expense records
   const fetchSummaryData = useCallback(async () => {
-    if (!user) return;
+    activeRequestRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setLoadState({ status: "loading", message: "" });
 
     try {
-      setLoadingData(true);
+      const response = await authenticatedFetch("/api/summary", {
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
 
-      // ✅ Fetch pre-aggregated data from API
-      const response = await authenticatedFetch("/api/summary");
-      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Gagal mengambil data ringkasan");
+        throw new Error(
+          getSafeSummaryError({
+            message: payload.error,
+            status: response.status,
+          }),
+        );
       }
 
-      const data = await response.json();
+      const normalizedData = normalizeSummaryPayload(payload);
+      if (controller.signal.aborted) return;
 
-      // ✅ Data already aggregated by the API - no client-side processing needed!
-      // Structure: { totalExpense, totalTransactions, expensesByCategory, expensesByMonth, categoryByMonth }
-      
-      // Store monthly data directly from API (no transformation needed)
-      setMonthlyData(data.expensesByMonth);
-      setCategoryByMonth(data.categoryByMonth);
-
-      // Set current month as default, or use the first available month
-      const currentMonthKey = new Date().toISOString().slice(0, 7);
-      const currentMonthSummary = data.expensesByMonth.find((m) => m.key === currentMonthKey);
-
-      if (currentMonthSummary) {
-        setSelectedMonth(currentMonthKey);
-        const catData = data.categoryByMonth[currentMonthKey] || [];
-        updateCurrentMonthData(currentMonthKey, catData, currentMonthSummary.total);
-      } else if (data.expensesByMonth.length > 0) {
-        const firstMonth = data.expensesByMonth[0];
-        setSelectedMonth(firstMonth.key);
-        const catData = data.categoryByMonth[firstMonth.key] || [];
-        updateCurrentMonthData(firstMonth.key, catData, firstMonth.total);
-      }
+      setSummaryData(normalizedData);
+      setSelectedMonth((currentSelection) =>
+        resolveSelectedMonth(normalizedData.monthlyData, currentSelection),
+      );
+      setLoadState({ status: "success", message: "" });
     } catch (error) {
-      console.error("Error fetching summary data:", error);
-      alert(error.message || "Gagal mengambil data ringkasan");
+      if (controller.signal.aborted || error?.name === "AbortError") return;
+
+      setLoadState({
+        status: "error",
+        message: getSafeSummaryError({
+          message: error instanceof Error ? error.message : "",
+        }),
+      });
     } finally {
-      setLoadingData(false);
+      if (activeRequestRef.current === controller) {
+        activeRequestRef.current = null;
+      }
     }
-  }, [updateCurrentMonthData, user]);
+  }, []);
 
   useEffect(() => {
-    if (user) {
-      fetchSummaryData();
-    }
-  }, [user, fetchSummaryData]);
+    fetchSummaryData();
 
-  // ✅ Updated to use categoryByMonth from API response
-  const handleMonthChange = (monthKey) => {
-    setSelectedMonth(monthKey);
-    const monthData = monthlyData.find((m) => m.key === monthKey);
-    if (monthData) {
-      const catData = categoryByMonth[monthKey] || [];
-      updateCurrentMonthData(monthKey, catData, monthData.total);
-    }
-  };
+    return () => {
+      activeRequestRef.current?.abort();
+    };
+  }, [fetchSummaryData]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  const selectedMonthData = useMemo(
+    () =>
+      summaryData?.monthlyData.find((month) => month.key === selectedMonth) ||
+      null,
+    [selectedMonth, summaryData],
+  );
 
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium">{payload[0].name}</p>
-          <p className="text-blue-600">{formatCurrency(payload[0].value)}</p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const selectedCategories = useMemo(() => {
+    if (!summaryData || !selectedMonthData) return [];
 
-  if (!isReady || loading || loadingData) {
+    const selectedTotal = Number(selectedMonthData.total || 0);
+    const categoryData = summaryData.categoryByMonth[selectedMonth];
+    if (!Array.isArray(categoryData)) return [];
+
+    return categoryData
+      .map((category) => {
+        const amount = Number(category.amount || 0);
+
+        return {
+          name: category.name || "Lainnya",
+          amount,
+          percentage:
+            selectedTotal > 0 ? (amount / selectedTotal) * 100 : 0,
+        };
+      })
+      .sort((first, second) => second.amount - first.amount);
+  }, [selectedMonth, selectedMonthData, summaryData]);
+
+  if (loadState.status === "loading") {
+    return <MonthlySummarySkeleton />;
+  }
+
+  if (loadState.status === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="mx-auto w-full max-w-4xl px-4 sm:px-0">
+        <ErrorState
+          title="Ringkasan belum dimuat"
+          description={loadState.message}
+          action={
+            <Button variant="secondary" onClick={fetchSummaryData}>
+              Coba lagi
+            </Button>
+          }
+        />
       </div>
     );
   }
 
-  if (!user) {
-    router.push("/login");
-    return null;
+  if (!summaryData?.monthlyData.length) {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-4 sm:px-0">
+        <EmptyState
+          icon={BarChart3}
+          title="Belum ada data pengeluaran"
+          description="Catat pengeluaran pertama untuk melihat ringkasan bulanan dan peringkat kategori."
+          action={
+            <Link href="/add" className="ui-button" data-variant="primary">
+              <PlusCircle className="size-4" aria-hidden="true" />
+              Tambah pengeluaran
+            </Link>
+          }
+        />
+      </div>
+    );
   }
 
   return (
-    <>
-      {!isMobile && <div className="max-w-4xl mx-auto p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Ringkasan Bulanan</h1>
-          <p className="text-gray-600">Lihat pengeluaran Anda berdasarkan bulan dan kategori</p>
-        </div>
-
-        {monthlyData.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">📊</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada data pengeluaran</h3>
-            <p className="text-gray-600 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
-            <button onClick={() => router.push("/add")} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              Tambah Pengeluaran
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Month Selector */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Bulan</label>
-              <select value={selectedMonth} onChange={(e) => handleMonthChange(e.target.value)} className="px-3 py-2 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                {monthlyData.map((month) => (
-                  <option key={month.key} value={month.key}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Current Month Summary */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">{monthlyData.find((m) => m.key === selectedMonth)?.label}</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Categories List */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-3">Pengeluaran per Kategori</h3>
-                  <div className="space-y-3">
-                    {currentMonthData.categories.map((category, index) => (
-                      <div key={category.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                          <span className="font-medium text-gray-900">{category.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-blue-600 font-semibold">{formatCurrency(category.amount)}</p>
-                          <p className="text-sm text-gray-600">{category.percentage}%</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Pie Chart */}
-                <div className="h-64">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={currentMonthData.chartData} dataKey="value" nameKey="name" outerRadius={80} label>
-                        {currentMonthData.chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Monthly Breakdown */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ringkasan Bulanan</h3>
-              <div className="space-y-3">
-                {monthlyData.map((month) => (
-                  <div key={month.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">{month.label}</p>
-                      <p className="text-sm text-gray-600">{month.transactionCount} transaksi</p>
-                    </div>
-                    <p className="text-blue-600 font-semibold">{formatCurrency(month.total)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>}
-
-      {isMobile && monthlyData.length > 0 ? (
-        <div>
-          <MobileSummary monthlyData={monthlyData} selectedMonth={selectedMonth} onMonthChange={handleMonthChange} currentMonthData={currentMonthData} />
-        </div>
-      ) : isMobile ? (
-        <div className="text-center py-12 px-4">
-          <div className="text-gray-400 text-6xl mb-4">📊</div>
-          <h3 className="text-lg font-medium text-white mb-2">Belum ada data pengeluaran</h3>
-          <p className="text-gray-400 mb-4">Mulai catat pengeluaran Anda untuk melihat ringkasan</p>
-          <button onClick={() => router.push("/add")} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-            Tambah Pengeluaran
-          </button>
-        </div>
-      ) : null}
-    </>
+    <MonthlySummary
+      categories={selectedCategories}
+      monthlyData={summaryData.monthlyData}
+      selectedMonth={selectedMonth}
+      selectedMonthData={selectedMonthData}
+      onMonthChange={setSelectedMonth}
+    />
   );
 }
