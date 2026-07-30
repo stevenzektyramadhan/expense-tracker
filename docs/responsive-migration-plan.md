@@ -2,7 +2,7 @@
 
 # Responsive migration plan
 
-Status: proposal only  
+Status: Phases 1–8 implemented; Phase 9 verification and cleanup gate pending
 Goal: move kiteCatat to one responsive source of truth without changing routes, backend contracts, finance behavior, authentication, ownership, uploads, or PWA installability
 
 ## 1. Current behavior
@@ -463,6 +463,8 @@ Rollback:
 
 ### Phase 8 — Authentication and feedback convergence
 
+Status: completed on 2026-07-30.
+
 Purpose: align auth with the product system and complete the feedback/overlay contract.
 
 Files to create:
@@ -479,10 +481,16 @@ Files to modify:
 - `src/app/(auth)/forgot-password/page.js`
 - `src/app/(auth)/update-password/page.js`
 - `src/app/(dashboard)/components/AllowanceModal.js`
+- `src/app/(dashboard)/allowance/page.js`
+- `src/app/(dashboard)/components/CategorySelect.js`
 - `src/app/(dashboard)/components/EditExpenseModal.js`
 - `src/app/(dashboard)/components/ExpenseDetailModal.js`
 - `src/app/(dashboard)/components/ImageZoomModal.js`
+- `src/app/(dashboard)/income/page.js`
+- `src/app/(dashboard)/page.js`
+- `src/app/globals.css`
 - `src/components/mobile/MobileExpenseDetailSheet.js`
+- `src/components/navigation/AppShell.js`
 
 Actions:
 
@@ -491,6 +499,12 @@ Actions:
 - Migrate custom overlays to shared accessible dialog/sheet primitives.
 - Keep one confirmation pattern for consequential expense/income deletion.
 - Replace the forced profile prompt with a non-blocking, dismissible prompt while preserving `supabase.auth.updateUser` behavior.
+
+Implementation notes:
+
+- The active dashboard profile prompt was already non-blocking and inline, so its existing behavior was preserved instead of introducing another overlay.
+- Logout, allowance editing, expense editing/detail/receipt zoom, expense deletion, income editing/deletion, and the mobile expense-detail sheet now use the shared feedback or overlay contract.
+- `MobileDashboard.js` still contains legacy SweetAlert behavior, but it remains unused migration input and was intentionally not deleted or refactored in this phase.
 
 Invariants:
 
@@ -522,11 +536,14 @@ Candidate legacy files to retain until explicit deletion approval:
 - `src/components/mobile/MobileDashboard.js`
 - `src/components/mobile/MobileAddExpense.js`
 - `src/components/mobile/MobileSummary.js`
-- `src/components/mobile/MobileExpenseDetailSheet.js`
 - `src/components/mobile/MobileShell.js`
 - `src/components/mobile/icons.js`
 - `src/hooks/useIsMobile.js`
 - replaced dashboard components such as `SummaryCards.js` or `ExpenseListItem.js`
+
+`MobileExpenseDetailSheet.js` is not a cleanup candidate after Phase 8. It is
+the active mobile presentation variant backed by the shared `Sheet` primitive
+and the dashboard's shared data/actions.
 
 Actions:
 

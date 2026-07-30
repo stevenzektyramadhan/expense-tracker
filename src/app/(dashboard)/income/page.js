@@ -5,11 +5,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { PlusCircle, X } from "lucide-react";
-import Swal from "sweetalert2";
+import { PlusCircle } from "lucide-react";
 
 import CurrencyAmount from "@/components/finance/CurrencyAmount";
 import Button from "@/components/ui/Button";
+import Dialog, { ConfirmDialog } from "@/components/ui/Dialog";
 import ErrorState from "@/components/ui/ErrorState";
 import FormField from "@/components/ui/FormField";
 import Skeleton from "@/components/ui/Skeleton";
@@ -45,82 +45,34 @@ function IncomeEditDialog({
   onClose,
   onSubmit,
 }) {
-  const dialogRef = useRef(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog?.open) dialog?.showModal();
-
-    return () => {
-      if (dialog?.open) dialog.close();
-    };
-  }, []);
-
   const requestClose = () => {
     if (!isSubmitting) onClose();
   };
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="edit-income-title"
-      aria-describedby="edit-income-description"
-      onCancel={(event) => {
-        event.preventDefault();
-        requestClose();
-      }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) requestClose();
-      }}
-      className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0 text-[var(--color-text)] shadow-[var(--elevation-2)] [&::backdrop]:bg-[var(--color-text)]/60"
+    <Dialog
+      open
+      onClose={requestClose}
+      preventClose={isSubmitting}
+      size="lg"
+      title="Edit pendapatan"
+      description="Perubahan jumlah atau tanggal dapat menyesuaikan saldo periode terkait."
     >
-      <div className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col">
-        <header className="flex min-w-0 shrink-0 items-start gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-raised)] px-5 py-4 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <h2
-              id="edit-income-title"
-              className="min-w-0 font-[family-name:var(--font-display-family)] text-xl font-bold tracking-[-0.02em] [overflow-wrap:anywhere]"
-            >
-              Edit pendapatan
-            </h2>
-            <p
-              id="edit-income-description"
-              className="mt-1 text-sm text-[var(--color-text-muted)]"
-            >
-              Perubahan jumlah atau tanggal dapat menyesuaikan saldo periode
-              terkait.
-            </p>
-          </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="quiet"
-            onClick={requestClose}
-            disabled={isSubmitting}
-            aria-label="Tutup dialog edit pendapatan"
-          >
-            <X className="size-5" aria-hidden="true" />
-          </Button>
-        </header>
-
-        <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6">
-          <IncomeForm
-            key={income.id}
-            context="dialog"
-            mode="edit"
-            initialValues={{
-              amount: income.amount,
-              source: income.source || "",
-              note: income.note || "",
-              date: formatDateForInput(income.date),
-            }}
-            isSubmitting={isSubmitting}
-            onSubmit={onSubmit}
-            onCancel={requestClose}
-          />
-        </div>
-      </div>
-    </dialog>
+      <IncomeForm
+        key={income.id}
+        context="dialog"
+        mode="edit"
+        initialValues={{
+          amount: income.amount,
+          source: income.source || "",
+          note: income.note || "",
+          date: formatDateForInput(income.date),
+        }}
+        isSubmitting={isSubmitting}
+        onSubmit={onSubmit}
+        onCancel={requestClose}
+      />
+    </Dialog>
   );
 }
 
@@ -135,6 +87,9 @@ export default function IncomeListPage() {
   const [actionError, setActionError] = useState("");
   const [editingIncome, setEditingIncome] = useState(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [incomeToDelete, setIncomeToDelete] = useState(null);
+  const [isDeletingIncome, setIsDeletingIncome] = useState(false);
+  const [deleteIncomeError, setDeleteIncomeError] = useState("");
   const activeRequestRef = useRef(null);
 
   const loadIncomes = useCallback(async () => {
@@ -229,29 +184,25 @@ export default function IncomeListPage() {
     }
   };
 
-  const handleDelete = async (income) => {
+  const handleDelete = (income) => {
     setActionError("");
+    setDeleteIncomeError("");
+    setIncomeToDelete(income);
+  };
 
-    // Phase 6 compatibility: deletion remains consequential because the
-    // server may reject it after the income has already been spent. The
-    // legacy SweetAlert confirmation migrates in the dedicated dialog phase.
-    const result = await Swal.fire({
-      title: "Hapus pendapatan?",
-      text: `Pendapatan ${formatCurrency(income.amount)} akan dihapus dan saldo akan disesuaikan.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "var(--color-expense)",
-      cancelButtonColor: "var(--color-text-muted)",
-      confirmButtonText: "Ya, hapus",
-      cancelButtonText: "Batal",
-    });
+  const handleConfirmIncomeDelete = async () => {
+    if (!incomeToDelete || isDeletingIncome) return;
 
-    if (!result.isConfirmed) return;
-
+    setIsDeletingIncome(true);
+    setDeleteIncomeError("");
+    setActionError("");
     try {
-      const response = await authenticatedFetch(`/api/incomes/${income.id}`, {
-        method: "DELETE",
-      });
+      const response = await authenticatedFetch(
+        `/api/incomes/${incomeToDelete.id}`,
+        {
+          method: "DELETE",
+        },
+      );
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -263,14 +214,18 @@ export default function IncomeListPage() {
       }
 
       setIncomes((current) =>
-        current.filter((item) => item.id !== income.id),
+        current.filter((item) => item.id !== incomeToDelete.id),
       );
+      setIncomeToDelete(null);
     } catch (error) {
       const safeError = getIncomeRequestError({
         message: error instanceof Error ? error.message : "",
         fallback: "Pendapatan belum dapat dihapus. Coba lagi.",
       });
+      setDeleteIncomeError(safeError.message);
       setActionError(safeError.message);
+    } finally {
+      setIsDeletingIncome(false);
     }
   };
 
@@ -429,6 +384,29 @@ export default function IncomeListPage() {
           onSubmit={handleEditSubmit}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(incomeToDelete)}
+        title="Hapus pendapatan?"
+        description={
+          incomeToDelete
+            ? `Pendapatan ${formatCurrency(
+                incomeToDelete.amount,
+              )} akan dihapus permanen dan saldo periode terkait akan disesuaikan.`
+            : ""
+        }
+        confirmLabel="Hapus pendapatan"
+        loadingLabel="Menghapus…"
+        isLoading={isDeletingIncome}
+        error={deleteIncomeError}
+        onClose={() => {
+          if (!isDeletingIncome) {
+            setIncomeToDelete(null);
+            setDeleteIncomeError("");
+          }
+        }}
+        onConfirm={handleConfirmIncomeDelete}
+      />
     </div>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 
 import CurrencyAmount from "@/components/finance/CurrencyAmount";
 import Button from "@/components/ui/Button";
+import Sheet from "@/components/ui/Sheet";
 import { formatDate } from "@/lib/utils";
 
 const wrappingAmountStyle = {
@@ -36,64 +36,43 @@ export default function MobileExpenseDetailSheet({
   onDelete,
   onZoom,
 }) {
-  const dialogRef = useRef(null);
-  const closeButtonRef = useRef(null);
   const copy = { ...fallbackLabels, ...labels };
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return undefined;
-
-    if (!dialog.open) dialog.showModal();
-    closeButtonRef.current?.focus();
-
-    return () => {
-      if (dialog.open) dialog.close();
-    };
-  }, []);
 
   if (!expense) return null;
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="fixed inset-x-0 bottom-0 top-auto z-[var(--z-modal)] m-0 w-full max-w-none overflow-visible border-0 bg-transparent p-0 text-[var(--color-text)] backdrop:bg-[var(--color-text)]/60"
-      aria-labelledby="mobile-expense-detail-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <article
-        className="mx-auto flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-t-[var(--radius-prominent)] border border-b-0 border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--elevation-2)]"
-        style={{
-          maxHeight:
-            "calc(100dvh - env(safe-area-inset-top, 0px) - var(--space-sm))",
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4">
-          <h2
-            id="mobile-expense-detail-title"
-            className="font-[family-name:var(--font-display-family)] text-lg font-bold"
-          >
-            {copy.title}
-          </h2>
+    <Sheet
+      open
+      onClose={onClose}
+      title={copy.title}
+      closeLabel={copy.close}
+      footer={
+        <div className="grid w-full grid-cols-2 gap-2">
+          {onEdit ? (
+            <Button fullWidth variant="secondary" onClick={() => onEdit(expense)}>
+              {copy.edit}
+            </Button>
+          ) : null}
+          {onDelete ? (
+            <Button
+              fullWidth
+              variant="destructive"
+              onClick={() => onDelete(expense.id)}
+            >
+              {copy.delete}
+            </Button>
+          ) : null}
           <Button
-            ref={closeButtonRef}
-            size="icon"
+            className="col-span-2"
+            fullWidth
             variant="quiet"
             onClick={onClose}
-            aria-label={copy.close}
           >
-            <X className="h-5 w-5" aria-hidden="true" />
+            {copy.close}
           </Button>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+        </div>
+      }
+    >
           <dl className="grid min-w-0 gap-4">
             <div className="min-w-0">
               <dt className="text-sm font-medium text-[var(--color-text-muted)]">
@@ -166,41 +145,6 @@ export default function MobileExpenseDetailSheet({
               </div>
             )}
           </div>
-        </div>
-
-        <footer
-          className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 pt-4"
-          style={{
-            paddingBottom:
-              "calc(var(--space-lg) + env(safe-area-inset-bottom, 0px))",
-          }}
-        >
-          <div className="grid grid-cols-2 gap-2">
-            {onEdit ? (
-              <Button fullWidth variant="secondary" onClick={() => onEdit(expense)}>
-                {copy.edit}
-              </Button>
-            ) : null}
-            {onDelete ? (
-              <Button
-                fullWidth
-                variant="destructive"
-                onClick={() => onDelete(expense.id)}
-              >
-                {copy.delete}
-              </Button>
-            ) : null}
-            <Button
-              className="col-span-2"
-              fullWidth
-              variant="quiet"
-              onClick={onClose}
-            >
-              {copy.close}
-            </Button>
-          </div>
-        </footer>
-      </article>
-    </dialog>
+    </Sheet>
   );
 }

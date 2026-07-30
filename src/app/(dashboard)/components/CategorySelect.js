@@ -1,30 +1,56 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useId } from "react";
+
+import FormField from "@/components/ui/FormField";
 import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";
 
-export default function CategorySelect({ value, onChange, customValue, onCustomChange }) {
-  const [showCustomInput, setShowCustomInput] = useState(value === "Lainnya");
-
-  useEffect(() => {
-    setShowCustomInput(value === "Lainnya");
-  }, [value]);
+export default function CategorySelect({
+  customValue,
+  disabled = false,
+  id,
+  onChange,
+  onCustomChange,
+  value,
+}) {
+  const generatedId = useId();
+  const controlId = id || `${generatedId}-category`;
+  const showCustomInput = value === "Lainnya";
 
   return (
-    <div>
-      <label className="block text-sm font-medium mb-1">Kategori</label>
-
-      {/* Dropdown */}
-      <select name="category" value={value} onChange={(e) => onChange(e.target.value)} className="w-full max-w-full border rounded px-2 py-1 bg-white">
+    <div className="grid gap-2">
+      <FormField label="Kategori" id={controlId} required>
+        <select
+          name="category"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+        >
         {DEFAULT_EXPENSE_CATEGORIES.map((category) => (
           <option key={category} value={category}>
             {category}
           </option>
         ))}
-      </select>
+        </select>
+      </FormField>
 
-      {/* Custom kategori muncul jika pilih Lainnya */}
-      {showCustomInput && <input type="text" placeholder="Tulis kategori lain..." className="mt-2 w-full border rounded px-2 py-1" value={customValue} onChange={(e) => onCustomChange(e.target.value)} />}
+      {showCustomInput ? (
+        <FormField
+          label="Nama kategori"
+          id={`${controlId}-custom`}
+          required
+          helperText="Gunakan nama yang singkat dan mudah dikenali."
+        >
+          <input
+            type="text"
+            value={customValue}
+            onChange={(event) => onCustomChange(event.target.value)}
+            placeholder="Contoh: Kesehatan"
+            maxLength={80}
+            disabled={disabled}
+          />
+        </FormField>
+      ) : null}
     </div>
   );
 }

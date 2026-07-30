@@ -9,10 +9,10 @@ import {
   PlusCircle,
   Wallet,
 } from "lucide-react";
-import Swal from "sweetalert2";
 import AppHeader from "@/components/navigation/AppHeader";
 import DesktopNavigation from "@/components/navigation/DesktopNavigation";
 import MobileBottomNav from "@/components/navigation/MobileBottomNav";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import Skeleton from "@/components/ui/Skeleton";
 import { signOut } from "@/lib/supabaseClient";
 
@@ -49,6 +49,8 @@ export default function AppShell({ children, isLoading = false, user }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   const routes = NAVIGATION_ROUTES.map((route) => ({
     ...route,
@@ -56,31 +58,25 @@ export default function AppShell({ children, isLoading = false, user }) {
   }));
   const routeTitle = getRouteTitle(pathname);
 
-  const handleLogout = useCallback(async () => {
-    if (isLoggingOut) return;
+  const handleLogout = useCallback(() => {
+    setLogoutError("");
+    setLogoutConfirmOpen(true);
+  }, []);
 
+  const handleConfirmLogout = useCallback(async () => {
+    if (isLoggingOut) return;
     setIsLoggingOut(true);
+    setLogoutError("");
 
     try {
-      // Phase 2 compatibility: retain the legacy SweetAlert confirmation in
-      // one shared handler. Migrate this UI in the later feedback/dialog phase.
-      const result = await Swal.fire({
-        title: "Logout",
-        text: "Apakah Anda yakin ingin keluar?",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#ef4444",
-        cancelButtonColor: "#6b7280",
-        confirmButtonText: "Ya, Keluar",
-        cancelButtonText: "Batal",
-        background: "#1f2937",
-        color: "#fff",
-      });
+      const { error } = await signOut();
+      if (error) throw error;
 
-      if (!result.isConfirmed) return;
-
-      await signOut();
+      setLogoutConfirmOpen(false);
       router.push("/login");
+    } catch (error) {
+      console.error("Failed signing out", error?.message || error);
+      setLogoutError("Sesi belum dapat ditutup. Periksa koneksi lalu coba lagi.");
     } finally {
       setIsLoggingOut(false);
     }
@@ -157,6 +153,20 @@ export default function AppShell({ children, isLoading = false, user }) {
           isLoggingOut={isLoggingOut}
         />
       )}
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Keluar dari kiteCatat?"
+        description="Anda perlu masuk kembali untuk melihat catatan keuangan."
+        confirmLabel="Keluar"
+        loadingLabel="Keluar…"
+        isLoading={isLoggingOut}
+        error={logoutError}
+        onClose={() => {
+          if (!isLoggingOut) setLogoutConfirmOpen(false);
+        }}
+        onConfirm={handleConfirmLogout}
+      />
     </div>
   );
 }

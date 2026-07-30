@@ -2,22 +2,30 @@
 
 import Image from "next/image";
 
+import Dialog from "@/components/ui/Dialog";
+
 export default function ImageZoomModal({ imageUrl, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
-      <div className="relative h-[80vh] w-[90vw] max-w-4xl">
-        <Image
-          src={imageUrl}
-          alt="Zoomed receipt"
-          fill
-          sizes="100vw"
-          className="object-contain"
-          priority
-        />
+    <Dialog
+      open
+      onClose={onClose}
+      size="xl"
+      title="Pratinjau struk"
+      description="Gambar diperbesar tanpa mengubah data transaksi."
+      bodyClassName="p-3 sm:p-4"
+    >
+      <div className="receipt-viewer">
+        <div className="relative h-[min(72dvh,48rem)] w-full">
+          <Image
+            src={imageUrl}
+            alt="Struk pengeluaran yang diperbesar"
+            fill
+            sizes="(max-width: 1024px) 96vw, 1024px"
+            className="object-contain"
+            priority
+          />
+        </div>
       </div>
-      <button className="absolute top-4 right-4 text-2xl text-white" onClick={onClose}>
-        ✕
-      </button>
-    </div>
+    </Dialog>
   );
 }

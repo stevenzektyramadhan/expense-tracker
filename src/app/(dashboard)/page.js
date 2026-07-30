@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { supabase } from "@/lib/supabaseClient";
 import MobileExpenseDetailSheet from "@/components/mobile/MobileExpenseDetailSheet";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import AllowanceModal from "./components/AllowanceModal";
 import EditExpenseModal from "./components/EditExpenseModal";
 import ExpenseDetailModal from "./components/ExpenseDetailModal";
@@ -74,6 +75,9 @@ export default function DashboardRoute() {
   const [zoomImage, setZoomImage] = useState(null);
   const [expenseBehindZoom, setExpenseBehindZoom] = useState(null);
   const [allowanceModalOpen, setAllowanceModalOpen] = useState(false);
+  const [expenseDeletion, setExpenseDeletion] = useState(null);
+  const [isDeletingExpense, setIsDeletingExpense] = useState(false);
+  const [deleteExpenseError, setDeleteExpenseError] = useState("");
   const [dismissedProfileUserId, setDismissedProfileUserId] = useState(null);
   const [completedProfileUserId, setCompletedProfileUserId] = useState(null);
   const allowancePromptPeriodRef = useRef(null);
@@ -178,32 +182,42 @@ export default function DashboardRoute() {
     }
   };
 
-  const handleDelete = async (id) => {
-    const expenseToRestore =
-      selectedExpense?.id === id ? selectedExpense : null;
+  const handleDelete = (id) => {
+    const expense =
+      selectedExpense?.id === id
+        ? selectedExpense
+        : expenses?.find((item) => item.id === id) || null;
+    const restoreDetail = selectedExpense?.id === id;
 
-    if (expenseToRestore) {
+    if (restoreDetail) {
       setSelectedExpense(null);
     } else {
       rememberOverlayTrigger();
     }
 
-    const { default: Swal } = await import("sweetalert2");
-    const result = await Swal.fire({
-      title: "Yakin mau hapus?",
-      text: "Data pengeluaran ini tidak bisa dikembalikan.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
-    });
+    setDeleteExpenseError("");
+    setExpenseDeletion({ expense, id, restoreDetail });
+  };
 
-    if (!result.isConfirmed) {
-      if (expenseToRestore) setSelectedExpense(expenseToRestore);
-      return;
+  const handleCancelExpenseDelete = () => {
+    if (isDeletingExpense) return;
+
+    const pendingDeletion = expenseDeletion;
+    setExpenseDeletion(null);
+    setDeleteExpenseError("");
+
+    if (pendingDeletion?.restoreDetail && pendingDeletion.expense) {
+      setSelectedExpense(pendingDeletion.expense);
+    } else {
+      restoreOverlayTrigger();
     }
+  };
+
+  const handleConfirmExpenseDelete = async () => {
+    if (!expenseDeletion || isDeletingExpense) return;
+
+    setIsDeletingExpense(true);
+    setDeleteExpenseError("");
 
     try {
       const response = await authenticatedFetch("/api/expenses", {
@@ -211,28 +225,26 @@ export default function DashboardRoute() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: expenseDeletion.id }),
       });
 
       if (response.ok) {
-        removeExpense(id);
+        removeExpense(expenseDeletion.id);
         refreshAllowance();
-        await Swal.fire(
-          "Terhapus!",
-          "Pengeluaran berhasil dihapus.",
-          "success",
-        );
+        setExpenseDeletion(null);
         restoreOverlayTrigger();
       } else {
         const payload = await response.json().catch(() => ({}));
         console.error("Failed deleting expense", payload);
-        await Swal.fire("Gagal!", "Gagal menghapus pengeluaran.", "error");
-        if (expenseToRestore) setSelectedExpense(expenseToRestore);
+        setDeleteExpenseError(
+          payload.error || "Pengeluaran belum dapat dihapus. Coba lagi.",
+        );
       }
     } catch (error) {
       console.error("Failed deleting expense", error);
-      await Swal.fire("Gagal!", "Gagal menghapus pengeluaran.", "error");
-      if (expenseToRestore) setSelectedExpense(expenseToRestore);
+      setDeleteExpenseError("Pengeluaran belum dapat dihapus. Coba lagi.");
+    } finally {
+      setIsDeletingExpense(false);
     }
   };
 
@@ -313,6 +325,26 @@ export default function DashboardRoute() {
       {zoomImage ? (
         <ImageZoomModal imageUrl={zoomImage} onClose={handleCloseZoom} />
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(expenseDeletion)}
+        title="Hapus pengeluaran?"
+        description={
+          expenseDeletion
+            ? `${
+                expenseDeletion.expense?.description?.trim() ||
+                expenseDeletion.expense?.category ||
+                "Pengeluaran ini"
+              } akan dihapus permanen dan sisa uang saku akan disesuaikan.`
+            : ""
+        }
+        confirmLabel="Hapus pengeluaran"
+        loadingLabel="Menghapus…"
+        isLoading={isDeletingExpense}
+        error={deleteExpenseError}
+        onClose={handleCancelExpenseDelete}
+        onConfirm={handleConfirmExpenseDelete}
+      />
 
       <AllowanceModal
         isOpen={allowanceModalOpen}

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 
 import CurrencyAmount from "@/components/finance/CurrencyAmount";
 import Button from "@/components/ui/Button";
+import Dialog from "@/components/ui/Dialog";
 import { formatDate } from "@/lib/utils";
 
 const wrappingAmountStyle = {
@@ -36,61 +36,35 @@ export default function ExpenseDetailModal({
   onDelete,
   onZoom,
 }) {
-  const dialogRef = useRef(null);
-  const closeButtonRef = useRef(null);
   const copy = { ...fallbackLabels, ...labels };
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return undefined;
-
-    if (!dialog.open) dialog.showModal();
-    closeButtonRef.current?.focus();
-
-    return () => {
-      if (dialog.open) dialog.close();
-    };
-  }, []);
 
   if (!expense) return null;
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="fixed left-1/2 top-1/2 z-[var(--z-modal)] m-0 w-[min(42rem,calc(100vw-2rem))] max-w-none -translate-x-1/2 -translate-y-1/2 overflow-visible border-0 bg-transparent p-0 text-[var(--color-text)] backdrop:bg-[var(--color-text)]/55 backdrop:backdrop-blur-sm"
-      aria-labelledby="expense-detail-dialog-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <article
-        className="flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--elevation-2)]"
-        style={{ maxHeight: "calc(100dvh - var(--space-2xl))" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4 sm:px-6">
-          <h2
-            id="expense-detail-dialog-title"
-            className="font-[family-name:var(--font-display-family)] text-xl font-bold"
-          >
-            {copy.title}
-          </h2>
-          <Button
-            ref={closeButtonRef}
-            size="icon"
-            variant="quiet"
-            onClick={onClose}
-            aria-label={copy.close}
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title={copy.title}
+      closeLabel={copy.close}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            {copy.close}
           </Button>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+          {onEdit ? (
+            <Button variant="secondary" onClick={() => onEdit(expense)}>
+              {copy.edit}
+            </Button>
+          ) : null}
+          {onDelete ? (
+            <Button variant="destructive" onClick={() => onDelete(expense.id)}>
+              {copy.delete}
+            </Button>
+          ) : null}
+        </>
+      }
+    >
           <dl className="grid min-w-0 gap-5 sm:grid-cols-2">
             <div className="min-w-0 sm:col-span-2">
               <dt className="text-sm font-medium text-[var(--color-text-muted)]">
@@ -161,24 +135,6 @@ export default function ExpenseDetailModal({
               </div>
             )}
           </div>
-        </div>
-
-        <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 sm:px-6">
-          <Button variant="secondary" onClick={onClose}>
-            {copy.close}
-          </Button>
-          {onEdit ? (
-            <Button variant="secondary" onClick={() => onEdit(expense)}>
-              {copy.edit}
-            </Button>
-          ) : null}
-          {onDelete ? (
-            <Button variant="destructive" onClick={() => onDelete(expense.id)}>
-              {copy.delete}
-            </Button>
-          ) : null}
-        </footer>
-      </article>
-    </dialog>
+    </Dialog>
   );
 }

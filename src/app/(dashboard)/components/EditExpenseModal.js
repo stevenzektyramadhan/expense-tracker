@@ -1,28 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { formatDateForInput } from "@/lib/utils";
-import { authenticatedFetch } from "@/lib/authenticatedFetch";
+import { useRef, useState } from "react";
+
+import Button from "@/components/ui/Button";
+import Dialog from "@/components/ui/Dialog";
+import FormField from "@/components/ui/FormField";
+import StatusBanner from "@/components/ui/StatusBanner";
 import CategorySelect from "./CategorySelect";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
+import { formatDateForInput } from "@/lib/utils";
 
 export default function EditExpenseModal({ expense, onClose, onUpdate }) {
-  const [selectedCategory, setSelectedCategory] = useState(expense.category || "Makanan");
+  const [selectedCategory, setSelectedCategory] = useState(
+    expense.category || "Makanan",
+  );
   const [customCategory, setCustomCategory] = useState("");
   const [loading, setLoading] = useState(false);
+  const [amountError, setAmountError] = useState("");
+  const [formError, setFormError] = useState("");
+  const amountInputRef = useRef(null);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const amount = Number(event.currentTarget.amount.value);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setAmountError("Jumlah belum valid. Masukkan nominal lebih dari Rp0.");
+      return;
+    }
 
     // kalau pilih Lainnya + isi kategori custom
-    const categoryToSave = selectedCategory === "Lainnya" && customCategory.trim() !== "" ? customCategory.trim() : selectedCategory;
+    const categoryToSave =
+      selectedCategory === "Lainnya" && customCategory.trim() !== ""
+        ? customCategory.trim()
+        : selectedCategory;
 
     const updatedData = {
-      amount: parseFloat(e.target.amount.value),
+      amount,
       category: categoryToSave, // ✅ pakai ini, bukan dari FormData
-      date: e.target.date.value,
-      description: e.target.description.value,
+      date: event.currentTarget.date.value,
+      description: event.currentTarget.description.value,
     };
+
+    setAmountError("");
+    setFormError("");
+    setLoading(true);
 
     try {
       const response = await authenticatedFetch("/api/expenses", {
@@ -45,55 +67,108 @@ export default function EditExpenseModal({ expense, onClose, onUpdate }) {
       onUpdate(payload);
       onClose();
     } catch (error) {
-      alert("Gagal update: " + error.message);
+      setFormError(
+        error.message || "Perubahan belum dapat disimpan. Coba lagi.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm text-black">
-      <div className="bg-white rounded-lg p-6 w-[90%] max-w-md relative">
-        {/* Tombol Close */}
-        <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" onClick={onClose}>
-          ✕
-        </button>
+    <Dialog
+      open
+      onClose={onClose}
+      preventClose={loading}
+      initialFocusRef={amountInputRef}
+      title="Edit pengeluaran"
+      description="Perubahan jumlah atau tanggal dapat menyesuaikan sisa uang saku."
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Batal
+          </Button>
+          <Button
+            type="submit"
+            form="edit-expense-form"
+            isLoading={loading}
+            loadingLabel="Menyimpan…"
+          >
+            Simpan perubahan
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="edit-expense-form"
+        onSubmit={handleSubmit}
+        className="grid gap-3"
+      >
+        {formError ? (
+          <StatusBanner tone="error" title="Perubahan belum tersimpan">
+            {formError}
+          </StatusBanner>
+        ) : null}
 
-        <h2 className="text-lg font-bold mb-4">Edit Pengeluaran</h2>
+        <FormField
+          label="Jumlah"
+          id="edit-expense-amount"
+          required
+          error={amountError}
+        >
+          <input
+            ref={amountInputRef}
+            type="number"
+            name="amount"
+            defaultValue={expense.amount}
+            min="1"
+            step="1"
+            inputMode="numeric"
+            onChange={() => {
+              if (amountError) setAmountError("");
+              if (formError) setFormError("");
+            }}
+            disabled={loading}
+          />
+        </FormField>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Jumlah */}
-          <div>
-            <label className="block text-sm font-medium">Jumlah</label>
-            <input type="number" name="amount" defaultValue={expense.amount} step="0.01" className="w-full border rounded px-2 py-1" />
-          </div>
+        <CategorySelect
+          id="edit-expense-category"
+          value={selectedCategory}
+          onChange={setSelectedCategory}
+          customValue={customCategory}
+          onCustomChange={setCustomCategory}
+          disabled={loading}
+        />
 
-          {/* ✅ Kategori pakai reusable */}
-          <CategorySelect value={selectedCategory} onChange={setSelectedCategory} customValue={customCategory} onCustomChange={setCustomCategory} />
+        <FormField label="Tanggal" id="edit-expense-date" required>
+          <input
+            type="date"
+            name="date"
+            defaultValue={formatDateForInput(expense.date)}
+            required
+            disabled={loading}
+          />
+        </FormField>
 
-          {/* Tanggal */}
-          <div>
-            <label className="block text-sm font-medium">Tanggal</label>
-            <input type="date" name="date" defaultValue={formatDateForInput(expense.date)} className="w-full border rounded px-2 py-1" />
-          </div>
-
-          {/* Deskripsi */}
-          <div>
-            <label className="block text-sm font-medium">Deskripsi</label>
-            <textarea name="description" defaultValue={expense.description} className="w-full border rounded px-2 py-1" />
-          </div>
-
-          {/* Tombol */}
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">
-              Batal
-            </button>
-            <button type="submit" disabled={loading} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
-              {loading ? "Menyimpan..." : "Simpan"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <FormField
+          label="Catatan"
+          id="edit-expense-description"
+          helperText="Opsional. Tambahkan konteks singkat untuk transaksi ini."
+        >
+          <textarea
+            name="description"
+            defaultValue={expense.description || ""}
+            maxLength={500}
+            disabled={loading}
+          />
+        </FormField>
+      </form>
+    </Dialog>
   );
 }
