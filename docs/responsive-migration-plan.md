@@ -2,7 +2,7 @@
 
 # Responsive migration plan
 
-Status: Phases 1–9 implemented; cleanup approval pending
+Status: Phases 1–9 and approved cleanup completed
 Goal: move kiteCatat to one responsive source of truth without changing routes, backend contracts, finance behavior, authentication, ownership, uploads, or PWA installability
 
 ## 1. Current behavior
@@ -504,7 +504,9 @@ Implementation notes:
 
 - The active dashboard profile prompt was already non-blocking and inline, so its existing behavior was preserved instead of introducing another overlay.
 - Logout, allowance editing, expense editing/detail/receipt zoom, expense deletion, income editing/deletion, and the mobile expense-detail sheet now use the shared feedback or overlay contract.
-- `MobileDashboard.js` still contains legacy SweetAlert behavior, but it remains unused migration input and was intentionally not deleted or refactored in this phase.
+- At the end of Phase 8, `MobileDashboard.js` still contained legacy SweetAlert
+  behavior as unused migration input. It was removed later in the explicitly
+  approved Phase 9 cleanup.
 
 Invariants:
 
@@ -525,7 +527,7 @@ Rollback:
 
 ### Phase 9 — Verification, deprecation, and approved cleanup gate
 
-Status: completed on 2026-07-30; cleanup approval pending.
+Status: completed on 2026-07-30; approved cleanup completed.
 
 Files to modify:
 
@@ -533,7 +535,7 @@ Files to modify:
 - `README.md` only if runtime architecture or authoritative validation commands changed
 - legacy files only to add deprecation comments after imports are removed
 
-Candidate legacy files to retain until explicit deletion approval:
+Legacy files deleted after explicit approval:
 
 - `src/components/mobile/MobileDashboard.js`
 - `src/components/mobile/MobileAddExpense.js`
@@ -550,20 +552,24 @@ and the dashboard's shared data/actions.
 Actions:
 
 - Search for all imports and runtime references.
-- Mark genuinely replaced files as deprecated; do not delete them.
+- Mark genuinely replaced files as deprecated before requesting deletion.
 - Complete full regression and viewport checks.
 - Present an exact deletion list and wait for explicit approval in a separate cleanup task.
+- After approval, delete only the verified files and remove dependencies that
+  no longer have an importer.
 
 Implementation notes:
 
 - The import audit and exact cleanup candidates are recorded in
   `docs/phase-9-verification.md`.
-- Eight files are marked deprecated and retained as rollback input.
+- Eight verified legacy files were deleted after explicit user approval.
+- `sweetalert2` was removed because its only importer was the deleted
+  `MobileDashboard.js`.
 - `MobileExpenseDetailSheet.js`, `MobileBottomNav.js`, `DashboardFilters.js`,
   and active domain overlays remain outside cleanup scope.
 - No route, API, finance calculation, auth configuration, database behavior, or
   production data was changed.
-- No file was deleted and no dependency was removed.
+- Rollback remains available through the Phase 8 and Phase 9 Git checkpoints.
 
 Validation:
 
@@ -575,7 +581,8 @@ Validation:
 
 Rollback:
 
-- Because legacy files remain, route entries can be reverted phase by phase. No cleanup occurs until replacements pass validation and deletion is approved.
+- Restore the Phase 8 or Phase 9 checkpoint from Git history if the removed
+  legacy implementation is ever needed for forensic comparison or rollback.
 
 ## 7. Migration risks and mitigations
 
@@ -607,8 +614,11 @@ A route is considered migrated only when:
 - existing API, finance, auth, ownership, and upload behavior passes regression checks;
 - mobile primary actions remain reachable with safe-area navigation;
 - `npm run lint` and `npm run build` complete successfully;
-- legacy replacements remain available for rollback until cleanup approval.
+- validated cleanup remains recoverable through Git history.
 
-## 9. Cleanup approval boundary
+## 9. Cleanup approval result
 
-This plan does not authorize deletion. After Phase 9, a separate cleanup proposal must list every candidate file, prove it has no imports or runtime references, report lint/build and manual regression results, and request explicit user approval before deletion.
+The cleanup proposal listed every candidate, proved that active importers were
+absent, reported validation results, and received explicit user approval before
+deletion. The approved cleanup removed only the eight documented legacy files
+and the now-unused `sweetalert2` dependency.

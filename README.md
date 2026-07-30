@@ -47,7 +47,7 @@ expense-tracker/
       layout.js
     components/
       finance/
-      mobile/        # legacy rollback input; except active focused variants
+      mobile/        # focused mobile presentation variants
       navigation/
       ui/
     features/
@@ -79,8 +79,8 @@ expense-tracker/
   mobile expense-detail sheet.
 - `src/components/mobile/MobileExpenseDetailSheet.js` remains an active
   presentation variant backed by shared dashboard data and actions.
-- Other legacy mobile page trees are retained only for rollback until a
-  separately approved cleanup. New code must not import them.
+- The replaced mobile page trees were removed after the approved Phase 9
+  cleanup. Their checkpoints remain available in Git history for rollback.
 
 ## Environment Variables
 
