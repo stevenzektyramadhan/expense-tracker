@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: replaced by the shared expense form in
+ * `src/features/expenses`. Retained only as rollback input until cleanup is
+ * explicitly approved. Do not add new imports.
+ */
 import { useState, useEffect } from "react";
 import MobileShell from "./MobileShell";
 import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";

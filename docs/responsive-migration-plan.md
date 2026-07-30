@@ -2,7 +2,7 @@
 
 # Responsive migration plan
 
-Status: Phases 1–8 implemented; Phase 9 verification and cleanup gate pending
+Status: Phases 1–9 implemented; cleanup approval pending
 Goal: move kiteCatat to one responsive source of truth without changing routes, backend contracts, finance behavior, authentication, ownership, uploads, or PWA installability
 
 ## 1. Current behavior
@@ -525,6 +525,8 @@ Rollback:
 
 ### Phase 9 — Verification, deprecation, and approved cleanup gate
 
+Status: completed on 2026-07-30; cleanup approval pending.
+
 Files to modify:
 
 - `docs/responsive-migration-plan.md`
@@ -551,6 +553,17 @@ Actions:
 - Mark genuinely replaced files as deprecated; do not delete them.
 - Complete full regression and viewport checks.
 - Present an exact deletion list and wait for explicit approval in a separate cleanup task.
+
+Implementation notes:
+
+- The import audit and exact cleanup candidates are recorded in
+  `docs/phase-9-verification.md`.
+- Eight files are marked deprecated and retained as rollback input.
+- `MobileExpenseDetailSheet.js`, `MobileBottomNav.js`, `DashboardFilters.js`,
+  and active domain overlays remain outside cleanup scope.
+- No route, API, finance calculation, auth configuration, database behavior, or
+  production data was changed.
+- No file was deleted and no dependency was removed.
 
 Validation:
 

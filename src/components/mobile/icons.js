@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: imported only by the deprecated MobileDashboard.
+ * Active navigation and product UI use the shared Lucide icon system.
+ * Retained until cleanup is explicitly approved. Do not add new imports.
+ */
 import React from "react";
 
 const IconBase = ({ children, className = "", ...props }) => (

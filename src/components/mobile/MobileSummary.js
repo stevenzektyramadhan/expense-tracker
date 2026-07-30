@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: replaced by the shared responsive reports feature in
+ * `src/features/reports`. Retained only as rollback input until cleanup is
+ * explicitly approved. Do not add new imports.
+ */
 import { Legend, Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import MobileShell from "./MobileShell";
 import { getCategoryDotColor } from "@/lib/finance";

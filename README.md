@@ -5,7 +5,7 @@ kiteCatat adalah aplikasi web personal finance untuk mencatat uang saku, pengelu
 ## Main Features
 
 - Login, register, forgot password, dan update password dengan Supabase Auth.
-- Dashboard desktop dan mobile.
+- Satu dashboard responsif untuk mobile, tablet, dan desktop.
 - Atur allowance atau uang saku per periode.
 - Tambah, edit, hapus pengeluaran.
 - Tambah, edit, hapus pendapatan tambahan.
@@ -46,7 +46,16 @@ expense-tracker/
       globals.css
       layout.js
     components/
-      mobile/
+      finance/
+      mobile/        # legacy rollback input; except active focused variants
+      navigation/
+      ui/
+    features/
+      auth/
+      dashboard/
+      expenses/
+      income/
+      reports/
     hooks/
     lib/
       authenticatedFetch.js
@@ -59,6 +68,19 @@ expense-tracker/
   next.config.mjs
   package.json
 ```
+
+## Frontend Architecture
+
+- Routes own one shared data and mutation source; viewport width does not change
+  finance queries, validation, or authorization behavior.
+- Layout changes primarily through CSS/Tailwind breakpoints.
+- Focused presentation variants remain where appropriate, such as desktop
+  navigation versus mobile bottom navigation and desktop expense dialog versus
+  mobile expense-detail sheet.
+- `src/components/mobile/MobileExpenseDetailSheet.js` remains an active
+  presentation variant backed by shared dashboard data and actions.
+- Other legacy mobile page trees are retained only for rollback until a
+  separately approved cleanup. New code must not import them.
 
 ## Environment Variables
 

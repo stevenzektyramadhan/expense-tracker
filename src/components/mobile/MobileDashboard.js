@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: replaced by the shared responsive dashboard in
+ * `src/features/dashboard`. Retained only as rollback input until cleanup is
+ * explicitly approved. Do not add new imports.
+ */
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

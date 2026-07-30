@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: imported only by deprecated mobile page trees.
+ * AppShell now owns authenticated navigation, spacing, status, and safe areas.
+ * Retained until cleanup is explicitly approved. Do not add new imports.
+ */
 // =============================================================================
 // MOBILE SHELL - Temporary Phase 2 compatibility wrapper
 // =============================================================================

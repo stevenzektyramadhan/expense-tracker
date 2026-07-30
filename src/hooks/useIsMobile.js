@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: no active route selects a full page tree by viewport.
+ * Responsive layout now uses CSS, with focused presentation variants receiving
+ * shared data and callbacks. Retained until cleanup is explicitly approved.
+ */
 import { useEffect, useState } from "react";
 
 const MOBILE_BREAKPOINT = 768;

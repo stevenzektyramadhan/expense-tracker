@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @deprecated Phase 9: replaced by the shared recent-transactions feature.
+ * No active runtime imports remain. Retained until cleanup is explicitly
+ * approved. Do not add new imports.
+ */
 import { formatCurrency, formatDate, getCategoryColor } from "@/lib/utils";
 
 export default function ExpenseListItem({ expense, onClick }) {
