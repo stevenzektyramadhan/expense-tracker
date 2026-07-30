@@ -1,402 +1,412 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V5
+ * Hallmark · genre: modern-minimal · macrostructure: Stat-Led · design-system: Calm Ledger · designed-as-app
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Swal from "sweetalert2";
-import toast from "react-hot-toast";
-import MobileShell from "@/components/mobile/MobileShell";
+import { PlusCircle } from "lucide-react";
+
+import CurrencyAmount from "@/components/finance/CurrencyAmount";
+import Button from "@/components/ui/Button";
+import Dialog, { ConfirmDialog } from "@/components/ui/Dialog";
+import ErrorState from "@/components/ui/ErrorState";
+import FormField from "@/components/ui/FormField";
+import Skeleton from "@/components/ui/Skeleton";
+import StatusBanner from "@/components/ui/StatusBanner";
+import IncomeForm, {
+  getIncomeRequestError,
+} from "@/features/income/IncomeForm";
+import IncomeList from "@/features/income/IncomeList";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import { formatDate, formatDateForInput, formatRupiah, parseRupiah } from "@/lib/utils";
+import { formatCurrency, formatDateForInput } from "@/lib/utils";
+
+const MONTH_OPTIONS = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
 const getCurrentMonth = () => new Date().getMonth() + 1;
 const getCurrentYear = () => new Date().getFullYear();
 
-const toastError = (message) => {
-  toast.error(message, {
-    style: {
-      background: "#1F2937",
-      color: "#FFFFFF",
-      border: "1px solid #374151",
-    },
-    iconTheme: {
-      primary: "#EF4444",
-      secondary: "#FFFFFF",
-    },
-  });
-};
-
-const toastSuccess = (message) => {
-  toast.success(message, {
-    style: {
-      background: "#1F2937",
-      color: "#FFFFFF",
-      border: "1px solid #374151",
-    },
-    iconTheme: {
-      primary: "#10B981",
-      secondary: "#FFFFFF",
-    },
-  });
-};
-
-function EditIncomeModal({ income, onClose, onSaved }) {
-  const [formData, setFormData] = useState({
-    amount: income.amount,
-    source: income.source || "",
-    note: income.note || "",
-    date: formatDateForInput(income.date),
-  });
-  const [displayAmount, setDisplayAmount] = useState(formatRupiah(income.amount));
-  const [saving, setSaving] = useState(false);
-
-  const handleAmountChange = (e) => {
-    const numericValue = parseRupiah(e.target.value);
-    setFormData((prev) => ({ ...prev, amount: numericValue || "" }));
-    setDisplayAmount(formatRupiah(numericValue));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.amount || !formData.date) {
-      toastError("Nominal dan tanggal wajib diisi.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await authenticatedFetch(`/api/incomes/${income.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: Number(formData.amount),
-          source: formData.source,
-          note: formData.note,
-          date: formData.date,
-        }),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || "Gagal mengubah pendapatan.");
-      }
-
-      toastSuccess("Pendapatan berhasil diperbarui.");
-      onSaved();
-      onClose();
-    } catch (err) {
-      toastError(err.message || "Gagal mengubah pendapatan.");
-    } finally {
-      setSaving(false);
-    }
+function IncomeEditDialog({
+  income,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}) {
+  const requestClose = () => {
+    if (!isSubmitting) onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 text-black">
-        <h2 className="text-xl font-semibold mb-4">Edit Pendapatan</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Nominal *</label>
-            <input
-              type="text"
-              value={displayAmount}
-              onChange={handleAmountChange}
-              inputMode="numeric"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Sumber</label>
-            <input
-              type="text"
-              value={formData.source}
-              onChange={(e) => setFormData((prev) => ({ ...prev, source: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Tanggal *</label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Catatan</label>
-            <textarea
-              value={formData.note}
-              onChange={(e) => setFormData((prev) => ({ ...prev, note: e.target.value }))}
-              rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 border border-gray-300 rounded-lg py-2"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 bg-blue-600 text-white rounded-lg py-2 disabled:bg-gray-400"
-            >
-              {saving ? "Menyimpan..." : "Simpan"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Dialog
+      open
+      onClose={requestClose}
+      preventClose={isSubmitting}
+      size="lg"
+      title="Edit pendapatan"
+      description="Perubahan jumlah atau tanggal dapat menyesuaikan saldo periode terkait."
+    >
+      <IncomeForm
+        key={income.id}
+        context="dialog"
+        mode="edit"
+        initialValues={{
+          amount: income.amount,
+          source: income.source || "",
+          note: income.note || "",
+          date: formatDateForInput(income.date),
+        }}
+        isSubmitting={isSubmitting}
+        onSubmit={onSubmit}
+        onCancel={requestClose}
+      />
+    </Dialog>
   );
 }
 
 export default function IncomeListPage() {
-  const [month, setMonth] = useState(getCurrentMonth());
-  const [year, setYear] = useState(getCurrentYear());
+  const [month, setMonth] = useState(getCurrentMonth);
+  const [year, setYear] = useState(getCurrentYear);
   const [incomes, setIncomes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadState, setLoadState] = useState({
+    status: "loading",
+    message: "",
+  });
+  const [actionError, setActionError] = useState("");
   const [editingIncome, setEditingIncome] = useState(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [incomeToDelete, setIncomeToDelete] = useState(null);
+  const [isDeletingIncome, setIsDeletingIncome] = useState(false);
+  const [deleteIncomeError, setDeleteIncomeError] = useState("");
+  const activeRequestRef = useRef(null);
 
   const loadIncomes = useCallback(async () => {
-    setLoading(true);
+    activeRequestRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setLoadState({ status: "loading", message: "" });
+
     try {
-      const response = await authenticatedFetch(`/api/incomes?month=${month}&year=${year}`);
+      const response = await authenticatedFetch(
+        `/api/incomes?month=${month}&year=${year}`,
+        { signal: controller.signal },
+      );
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || "Gagal memuat pendapatan tambahan.");
+        throw getIncomeRequestError({
+          status: response.status,
+          message: payload.error,
+          fallback: "Riwayat pendapatan belum dapat dimuat. Coba lagi.",
+        });
       }
 
-      setIncomes(payload.data || []);
-    } catch (err) {
-      toastError(err.message || "Gagal memuat pendapatan tambahan.");
-      setIncomes([]);
+      if (controller.signal.aborted) return;
+
+      setIncomes(Array.isArray(payload.data) ? payload.data : []);
+      setLoadState({ status: "success", message: "" });
+    } catch (error) {
+      if (controller.signal.aborted || error?.name === "AbortError") return;
+
+      const safeError = getIncomeRequestError({
+        message: error instanceof Error ? error.message : "",
+        fallback: "Riwayat pendapatan belum dapat dimuat. Coba lagi.",
+      });
+      setLoadState({ status: "error", message: safeError.message });
     } finally {
-      setLoading(false);
+      if (activeRequestRef.current === controller) {
+        activeRequestRef.current = null;
+      }
     }
   }, [month, year]);
 
   useEffect(() => {
     loadIncomes();
+
+    return () => {
+      activeRequestRef.current?.abort();
+    };
   }, [loadIncomes]);
 
-  const handleDelete = async (income) => {
-    const result = await Swal.fire({
-      title: "Hapus pendapatan?",
-      text: `Pendapatan ${formatRupiah(income.amount)} akan dihapus dan saldo akan disesuaikan.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#dc2626",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Ya, hapus",
-      cancelButtonText: "Batal",
-    });
+  const years = useMemo(() => {
+    const currentYear = getCurrentYear();
+    return [currentYear - 1, currentYear, currentYear + 1];
+  }, []);
 
-    if (!result.isConfirmed) return;
+  const totalIncome = useMemo(
+    () =>
+      incomes.reduce((total, income) => total + Number(income.amount || 0), 0),
+    [incomes],
+  );
+
+  const handleEditSubmit = async (values) => {
+    if (!editingIncome || isSavingEdit) return;
+
+    setIsSavingEdit(true);
 
     try {
-      const response = await authenticatedFetch(`/api/incomes/${income.id}`, {
-        method: "DELETE",
-      });
-
+      const response = await authenticatedFetch(
+        `/api/incomes/${editingIncome.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        },
+      );
       const payload = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error(payload.error || "Gagal menghapus pendapatan.");
+        throw getIncomeRequestError({
+          status: response.status,
+          message: payload.error,
+          fallback: "Pendapatan belum dapat diperbarui. Coba lagi.",
+        });
       }
 
-      toastSuccess("Pendapatan berhasil dihapus.");
-      setIncomes((prev) => prev.filter((item) => item.id !== income.id));
-    } catch (err) {
-      toastError(err.message || "Gagal menghapus pendapatan.");
+      setEditingIncome(null);
+      await loadIncomes();
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
-  const totalIncome = useMemo(() => incomes.reduce((sum, income) => sum + income.amount, 0), [incomes]);
+  const handleDelete = (income) => {
+    setActionError("");
+    setDeleteIncomeError("");
+    setIncomeToDelete(income);
+  };
 
-  const monthOptions = useMemo(
-    () => [
-      "Januari",
-      "Februari",
-      "Maret",
-      "April",
-      "Mei",
-      "Juni",
-      "Juli",
-      "Agustus",
-      "September",
-      "Oktober",
-      "November",
-      "Desember",
-    ],
-    []
-  );
+  const handleConfirmIncomeDelete = async () => {
+    if (!incomeToDelete || isDeletingIncome) return;
 
-  const years = useMemo(() => {
-    const current = getCurrentYear();
-    return [current - 1, current, current + 1];
-  }, []);
+    setIsDeletingIncome(true);
+    setDeleteIncomeError("");
+    setActionError("");
+    try {
+      const response = await authenticatedFetch(
+        `/api/incomes/${incomeToDelete.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw getIncomeRequestError({
+          status: response.status,
+          message: payload.error,
+          fallback: "Pendapatan belum dapat dihapus. Coba lagi.",
+        });
+      }
+
+      setIncomes((current) =>
+        current.filter((item) => item.id !== incomeToDelete.id),
+      );
+      setIncomeToDelete(null);
+    } catch (error) {
+      const safeError = getIncomeRequestError({
+        message: error instanceof Error ? error.message : "",
+        fallback: "Pendapatan belum dapat dihapus. Coba lagi.",
+      });
+      setDeleteIncomeError(safeError.message);
+      setActionError(safeError.message);
+    } finally {
+      setIsDeletingIncome(false);
+    }
+  };
+
+  const isLoading = loadState.status === "loading";
+  const selectedPeriodLabel = `${MONTH_OPTIONS[month - 1]} ${year}`;
 
   return (
-    <>
-      <div className="hidden md:block max-w-4xl mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Pendapatan Tambahan</h1>
-            <p className="text-gray-600">Riwayat top up budget berdasarkan periode</p>
-          </div>
-          <Link href="/income/add" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            + Tambah Pendapatan
-          </Link>
+    <div className="mx-auto grid w-full max-w-5xl min-w-0 grid-cols-1 gap-5 px-4 sm:px-0 md:gap-6">
+      <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="sr-only min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] [overflow-wrap:anywhere] md:not-sr-only">
+            Pendapatan tambahan
+          </h1>
+          <p className="hidden max-w-2xl text-sm text-[var(--color-text-muted)] md:mt-1 md:block">
+            Tinjau uang yang menambah saldo dan periode yang menerimanya.
+          </p>
         </div>
+        <Link
+          href="/income/add"
+          className="ui-button w-full sm:w-auto"
+          data-variant="primary"
+        >
+          <PlusCircle className="size-5" aria-hidden="true" />
+          Tambah pendapatan
+        </Link>
+      </header>
 
-        <div className="bg-white rounded-xl shadow p-4 flex flex-wrap items-end gap-4 text-black">
-          <div>
-            <label className="text-sm text-gray-600">Bulan</label>
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="block mt-1 border border-gray-300 rounded-lg px-3 py-2">
-              {monthOptions.map((monthName, index) => (
-                <option key={monthName} value={index + 1}>
-                  {monthName}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm text-gray-600">Tahun</label>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="block mt-1 border border-gray-300 rounded-lg px-3 py-2">
-              {years.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="ml-auto text-right">
-            <p className="text-sm text-gray-500">Total Pendapatan Tambahan</p>
-            <p className="text-2xl font-bold text-green-600">{formatRupiah(totalIncome)}</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">Memuat data...</div>
-          ) : incomes.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">Belum ada pendapatan tambahan di periode ini.</div>
-          ) : (
-            <ul className="divide-y divide-gray-200">
-              {incomes.map((income) => (
-                <li key={income.id} className="p-4 flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-gray-900">{formatRupiah(income.amount)}</p>
-                    <p className="text-sm text-gray-600">{income.source || "Sumber tidak diisi"}</p>
-                    <p className="text-xs text-gray-500 mt-1">{formatDate(income.date)}</p>
-                    {income.note && <p className="text-sm text-gray-600 mt-2">{income.note}</p>}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingIncome(income)}
-                      className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(income)}
-                      className="px-3 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      <div className="md:hidden">
-        <MobileShell>
-          <div className="p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">Pendapatan Tambahan</h1>
-                <p className="text-sm text-gray-400">Top up budget Anda</p>
-              </div>
-              <Link href="/income/add" className="bg-blue-600 px-3 py-2 rounded-lg text-sm font-semibold">
-                + Tambah
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="bg-gray-800 rounded-xl px-4 py-3 text-white outline-none">
-                {monthOptions.map((monthName, index) => (
+      <section
+        className="grid min-w-0 gap-4 rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--elevation-1)] md:grid-cols-[minmax(0,1fr)_minmax(15rem,0.7fr)] md:items-end md:p-5"
+        aria-labelledby="income-period-heading"
+      >
+        <div className="min-w-0">
+          <h2
+            id="income-period-heading"
+            className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
+          >
+            Periode riwayat
+          </h2>
+          <div className="mt-3 grid min-w-0 grid-cols-2 gap-3">
+            <FormField label="Bulan" id="income-month-filter">
+              <select
+                value={month}
+                onChange={(event) => {
+                  setMonth(Number(event.target.value));
+                  setActionError("");
+                }}
+              >
+                {MONTH_OPTIONS.map((monthName, index) => (
                   <option key={monthName} value={index + 1}>
                     {monthName}
                   </option>
                 ))}
               </select>
-              <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="bg-gray-800 rounded-xl px-4 py-3 text-white outline-none">
+            </FormField>
+            <FormField label="Tahun" id="income-year-filter">
+              <select
+                value={year}
+                onChange={(event) => {
+                  setYear(Number(event.target.value));
+                  setActionError("");
+                }}
+              >
                 {years.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
                 ))}
               </select>
-            </div>
+            </FormField>
+          </div>
+        </div>
 
-            <div className="bg-gradient-to-r from-green-600 to-emerald-500 rounded-2xl p-5">
-              <p className="text-sm text-green-100 mb-1">Total Pendapatan Periode Ini</p>
-              <p className="text-3xl font-bold text-white">{formatRupiah(totalIncome)}</p>
-            </div>
+        <div className="min-w-0 border-t border-[var(--color-border)] pt-4 md:border-l md:border-t-0 md:pb-5 md:pl-5 md:pt-0">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Total pendapatan · {selectedPeriodLabel}
+          </p>
+          {isLoading ? (
+            <Skeleton
+              className="mt-2"
+              width="min(100%, 16rem)"
+              height="2.25rem"
+              label="Memuat total pendapatan"
+            />
+          ) : loadState.status === "success" ? (
+            <CurrencyAmount
+              amount={totalIncome}
+              tone={totalIncome > 0 ? "income" : "neutral"}
+              showSign={totalIncome > 0}
+              className="mt-1 block min-w-0 font-[family-name:var(--font-display-family)] text-[clamp(1.75rem,7vw,2.5rem)] font-bold tracking-[-0.035em]"
+              style={{ overflowWrap: "anywhere", whiteSpace: "normal" }}
+            />
+          ) : (
+            <span
+              className="mt-1 block text-3xl font-bold text-[var(--color-text-muted)]"
+              aria-label="Total pendapatan tidak tersedia"
+            >
+              —
+            </span>
+          )}
+        </div>
+      </section>
 
-            <div className="space-y-3">
-              {loading && <div className="text-gray-400 text-center py-8">Memuat data...</div>}
-              {!loading && incomes.length === 0 && <div className="text-gray-400 text-center py-8">Belum ada pendapatan tambahan.</div>}
-              {!loading && incomes.map((income) => (
-                <div key={income.id} className="bg-gray-800 rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-lg font-bold text-white">{formatRupiah(income.amount)}</p>
-                      <p className="text-sm text-gray-400">{income.source || "Sumber tidak diisi"}</p>
-                      <p className="text-xs text-gray-500 mt-1">{formatDate(income.date)}</p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => setEditingIncome(income)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(income)}
-                        className="px-3 py-1.5 rounded-lg bg-red-600 text-sm"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
-                  {income.note && <p className="text-sm text-gray-300 mt-3">{income.note}</p>}
-                </div>
-              ))}
+      {loadState.status === "error" ? (
+        <ErrorState
+          title="Riwayat pendapatan belum dimuat"
+          description={loadState.message}
+          action={
+            <Button onClick={loadIncomes} variant="secondary">
+              Coba lagi
+            </Button>
+          }
+        />
+      ) : null}
+
+      {actionError ? (
+        <StatusBanner tone="error" title="Pendapatan belum dihapus">
+          <p>{actionError}</p>
+        </StatusBanner>
+      ) : null}
+
+      {loadState.status !== "error" ? (
+        <section className="min-w-0" aria-labelledby="income-history-heading">
+          <div className="mb-3 flex min-w-0 items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h2
+                id="income-history-heading"
+                className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
+              >
+                Riwayat pendapatan
+              </h2>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                {loadState.status === "success"
+                  ? `${incomes.length} catatan pada ${selectedPeriodLabel}`
+                  : `Memuat catatan ${selectedPeriodLabel}`}
+              </p>
             </div>
           </div>
-        </MobileShell>
-      </div>
 
-      {editingIncome && (
-        <EditIncomeModal
+          <IncomeList
+            incomes={incomes}
+            isLoading={isLoading}
+            onEdit={(income) => {
+              setActionError("");
+              setEditingIncome(income);
+            }}
+            onDelete={handleDelete}
+          />
+        </section>
+      ) : null}
+
+      {editingIncome ? (
+        <IncomeEditDialog
           income={editingIncome}
+          isSubmitting={isSavingEdit}
           onClose={() => setEditingIncome(null)}
-          onSaved={loadIncomes}
+          onSubmit={handleEditSubmit}
         />
-      )}
-    </>
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(incomeToDelete)}
+        title="Hapus pendapatan?"
+        description={
+          incomeToDelete
+            ? `Pendapatan ${formatCurrency(
+                incomeToDelete.amount,
+              )} akan dihapus permanen dan saldo periode terkait akan disesuaikan.`
+            : ""
+        }
+        confirmLabel="Hapus pendapatan"
+        loadingLabel="Menghapus…"
+        isLoading={isDeletingIncome}
+        error={deleteIncomeError}
+        onClose={() => {
+          if (!isDeletingIncome) {
+            setIncomeToDelete(null);
+            setDeleteIncomeError("");
+          }
+        }}
+        onConfirm={handleConfirmIncomeDelete}
+      />
+    </div>
   );
 }

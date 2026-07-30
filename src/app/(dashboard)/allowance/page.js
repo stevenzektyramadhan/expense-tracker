@@ -1,18 +1,35 @@
 "use client";
+
 import { useState } from "react";
+
+import Button from "@/components/ui/Button";
+import FormField from "@/components/ui/FormField";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import Swal from "sweetalert2";
+import { formatRupiah, parseRupiah } from "@/lib/utils";
 
 export default function AllowancePage() {
   const { user } = useAuth();
   const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [amountError, setAmountError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [saved, setSaved] = useState(false);
 
-  const handleSave = async () => {
+  const handleSave = async (event) => {
+    event.preventDefault();
     if (!user) return;
 
-    const parsedAmount = parseFloat(amount);
+    const parsedAmount = parseRupiah(amount);
+    if (parsedAmount <= 0) {
+      setAmountError("Nominal belum valid. Masukkan jumlah lebih dari Rp0.");
+      return;
+    }
 
+    setLoading(true);
+    setFormError("");
+    setSaved(false);
     try {
       const response = await authenticatedFetch("/api/allowances", {
         method: "PUT",
@@ -30,19 +47,73 @@ export default function AllowancePage() {
         throw new Error(payload.error || "Gagal menyimpan uang saku");
       }
 
-      Swal.fire("Berhasil", "Uang saku berhasil disimpan", "success");
+      setSaved(true);
     } catch (error) {
-      Swal.fire("Error", error.message || "Gagal menyimpan uang saku", "error");
+      setFormError(
+        error.message || "Uang saku belum dapat disimpan. Coba lagi.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Atur Uang Saku Bulanan</h1>
-      <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-3 py-2 border rounded-lg" placeholder="Masukkan nominal (Rp)" />
-      <button onClick={handleSave} className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg">
-        Simpan
-      </button>
+    <div className="mx-auto grid w-full max-w-xl gap-5 px-4 sm:px-0">
+      <header>
+        <h1 className="font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em]">
+          Atur uang saku bulanan
+        </h1>
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+          Nominal ini menjadi dasar saldo sebelum pendapatan tambahan.
+        </p>
+      </header>
+
+      <form
+        className="grid gap-4 rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--elevation-1)] sm:p-5"
+        onSubmit={handleSave}
+      >
+        {formError ? (
+          <StatusBanner tone="error" title="Uang saku belum tersimpan">
+            {formError}
+          </StatusBanner>
+        ) : null}
+        {saved ? (
+          <StatusBanner tone="success" title="Uang saku tersimpan">
+            Ringkasan saldo akan memakai nominal terbaru.
+          </StatusBanner>
+        ) : null}
+
+        <FormField
+          label="Nominal bulanan"
+          id="allowance-page-amount"
+          required
+          error={amountError}
+        >
+          <input
+            type="text"
+            inputMode="numeric"
+            value={amount}
+            onChange={(event) => {
+              const numericValue = parseRupiah(event.target.value);
+              setAmount(numericValue > 0 ? formatRupiah(numericValue) : "");
+              if (amountError) setAmountError("");
+              if (formError) setFormError("");
+              if (saved) setSaved(false);
+            }}
+            placeholder="Rp0"
+            disabled={loading}
+          />
+        </FormField>
+
+        <Button
+          type="submit"
+          fullWidth
+          isLoading={loading}
+          loadingLabel="Menyimpan…"
+        >
+          Simpan uang saku
+        </Button>
+      </form>
     </div>
   );
 }

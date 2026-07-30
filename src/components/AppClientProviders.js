@@ -8,25 +8,31 @@ export default function AppClientProviders() {
     <>
       <Toaster
         position="top-center"
+        containerStyle={{
+          top: "max(var(--space-md), env(safe-area-inset-top))",
+          zIndex: "var(--z-toast)",
+        }}
         toastOptions={{
           duration: 4000,
           style: {
-            background: "#fff",
-            color: "#363636",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            borderRadius: "8px",
-            padding: "12px 16px",
+            background: "var(--color-surface)",
+            color: "var(--color-text)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "var(--elevation-2)",
+            borderRadius: "var(--radius-surface)",
+            padding: "var(--space-sm) var(--space-md)",
+            fontFamily: "var(--font-body)",
           },
           success: {
             iconTheme: {
-              primary: "#22c55e",
-              secondary: "#fff",
+              primary: "var(--color-income-strong)",
+              secondary: "var(--color-surface)",
             },
           },
           error: {
             iconTheme: {
-              primary: "#ef4444",
-              secondary: "#fff",
+              primary: "var(--color-expense-strong)",
+              secondary: "var(--color-surface)",
             },
           },
         }}

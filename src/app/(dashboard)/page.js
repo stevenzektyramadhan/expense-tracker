@@ -1,435 +1,359 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import Link from "next/link";
-import dynamic from "next/dynamic";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import UnifiedDashboardPage from "@/features/dashboard/DashboardPage";
+import useDashboardData from "@/features/dashboard/useDashboardData";
 import { useAuth } from "@/hooks/useAuth";
-import { useIsMobile } from "@/hooks/useIsMobile";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
-import { DEFAULT_EXPENSE_CATEGORIES, getExpensesForPeriod, getPeriodLabel } from "@/lib/finance";
-
-// Components
-import SummaryCards from "./components/SummaryCards";
-import ExpenseListItem from "./components/ExpenseListItem";
-import ExpenseDetailModal from "./components/ExpenseDetailModal";
-import EditExpenseModal from "./components/EditExpenseModal";
-import ImageZoomModal from "./components/ImageZoomModal";
-import DashboardFilters from "./components/DashboardFilters";
+import { supabase } from "@/lib/supabaseClient";
+import MobileExpenseDetailSheet from "@/components/mobile/MobileExpenseDetailSheet";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import AllowanceModal from "./components/AllowanceModal";
+import EditExpenseModal from "./components/EditExpenseModal";
+import ExpenseDetailModal from "./components/ExpenseDetailModal";
+import ImageZoomModal from "./components/ImageZoomModal";
 
-const MobileDashboard = dynamic(() => import("@/components/mobile/MobileDashboard"), {
-  ssr: false,
-});
-
-const MobileExpenseDetailSheet = dynamic(() => import("@/components/mobile/MobileExpenseDetailSheet"), {
-  ssr: false,
-});
-
-const getCurrentMonthValue = () => {
-  return String(new Date().getMonth() + 1).padStart(2, "0");
+const DETAIL_LABELS = {
+  title: "Detail pengeluaran",
+  description: "Deskripsi",
+  category: "Kategori",
+  date: "Tanggal",
+  amount: "Jumlah",
+  receipt: "Struk",
+  noDescription: "Tanpa deskripsi",
+  noReceipt: "Tidak ada foto struk",
+  zoom: "Perbesar struk",
+  edit: "Edit",
+  delete: "Hapus",
+  close: "Tutup",
 };
 
-const getCurrentYearValue = () => new Date().getFullYear();
+function ResponsiveExpenseDetailOverlay(props) {
+  const [useDesktopGeometry, setUseDesktopGeometry] = useState(false);
 
-export default function DashboardPage() {
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const updateGeometry = () => setUseDesktopGeometry(mediaQuery.matches);
+
+    updateGeometry();
+    mediaQuery.addEventListener("change", updateGeometry);
+
+    return () => mediaQuery.removeEventListener("change", updateGeometry);
+  }, []);
+
+  const DetailOverlay = useDesktopGeometry
+    ? ExpenseDetailModal
+    : MobileExpenseDetailSheet;
+
+  return <DetailOverlay {...props} />;
+}
+
+export default function DashboardRoute() {
   const { user } = useAuth();
-  const { isMobile, isReady } = useIsMobile();
-  const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [allowance, setAllowance] = useState(null);
-  const [additionalIncomes, setAdditionalIncomes] = useState([]);
+  const router = useRouter();
+  const userId = user?.id || null;
+  const {
+    allowance,
+    expenses,
+    filters,
+    updateFilters,
+    filteredExpenses,
+    availableExpensePeriods,
+    currentAllowancePeriod,
+    metrics,
+    requestState,
+    refreshAllowance,
+    refreshExpenses,
+    refreshIncomes,
+    removeExpense,
+    replaceExpense,
+  } = useDashboardData({ userId });
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [editingExpense, setEditingExpense] = useState(null);
   const [zoomImage, setZoomImage] = useState(null);
-  const [filters, setFilters] = useState({
-    month: getCurrentMonthValue(),
-    category: "",
-    search: "",
-    sort: "date-desc",
-  });
-  const [open, setOpen] = useState(false);
+  const [expenseBehindZoom, setExpenseBehindZoom] = useState(null);
+  const [allowanceModalOpen, setAllowanceModalOpen] = useState(false);
+  const [expenseDeletion, setExpenseDeletion] = useState(null);
+  const [isDeletingExpense, setIsDeletingExpense] = useState(false);
+  const [deleteExpenseError, setDeleteExpenseError] = useState("");
+  const [dismissedProfileUserId, setDismissedProfileUserId] = useState(null);
+  const [completedProfileUserId, setCompletedProfileUserId] = useState(null);
   const allowancePromptPeriodRef = useRef(null);
-
-  // 🔹 Cek allowance bulan ini, kalau belum ada → buat
-  const loadAllowance = useCallback(
-    async ({ shouldPrompt = false } = {}) => {
-      if (!user) return;
-
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
-      const periodKey = `${year}-${month}`;
-      const sessionKey = `allowancePrompted:${user.id}:${periodKey}`;
-      const hasPromptedThisSession =
-        allowancePromptPeriodRef.current === periodKey ||
-        (typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "true");
-
-      const markPeriodHandled = () => {
-        allowancePromptPeriodRef.current = periodKey;
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem(sessionKey, "true");
-        }
-      };
-
-      let data = null;
-
-      try {
-        const response = await authenticatedFetch("/api/allowances");
-        data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(data?.error || "Failed to load allowance");
-        }
-      } catch (error) {
-        console.error("Failed to load allowance", error);
-        setAllowance(null);
-
-        if (shouldPrompt && !hasPromptedThisSession) {
-          setOpen(true);
-          markPeriodHandled();
-        }
-        return;
-      }
-
-      if (data) {
-        setAllowance({
-          ...data,
-          amount: Number(data.amount),
-          remaining: Number(data.remaining),
-        });
-        markPeriodHandled();
-        return;
-      }
-
-      setAllowance(null);
-
-      if (shouldPrompt && !hasPromptedThisSession) {
-        setOpen(true);
-        markPeriodHandled();
-      }
-    },
-    [user]
-  );
-
-  const loadExpenses = useCallback(async () => {
-    if (!user) return;
-
-    const queryOptions = {};
-
-    if (!isMobile && filters.month) {
-      const now = new Date();
-      const year = now.getFullYear();
-      const monthNumber = Number(filters.month);
-      const lastDay = new Date(year, monthNumber, 0).getDate();
-
-      queryOptions.startDate = `${year}-${String(monthNumber).padStart(2, "0")}-01`;
-      queryOptions.endDate = `${year}-${String(monthNumber).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    }
-
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (queryOptions.startDate) params.set("startDate", queryOptions.startDate);
-      if (queryOptions.endDate) params.set("endDate", queryOptions.endDate);
-
-      const url = params.toString() ? `/api/expenses?${params.toString()}` : "/api/expenses";
-      const response = await authenticatedFetch(url);
-      const data = await response.json().catch(() => []);
-
-      if (!response.ok) {
-        throw new Error(data.error || "Gagal memuat pengeluaran");
-      }
-
-      setError("");
-      setExpenses(data || []);
-    } catch (error) {
-      setError(error.message);
-    }
-    setLoading(false);
-  }, [user, isMobile, filters.month]);
-
-  const loadIncomes = useCallback(async () => {
-    if (!user) return;
-
-    const month = Number(filters.month || getCurrentMonthValue());
-    const year = getCurrentYearValue();
-
-    try {
-      const response = await authenticatedFetch(`/api/incomes?month=${month}&year=${year}`);
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Gagal memuat pendapatan tambahan");
-      }
-
-      setAdditionalIncomes(payload.data || []);
-    } catch (err) {
-      console.error("Failed to load incomes", err);
-      setAdditionalIncomes([]);
-    }
-  }, [user, filters.month]);
+  const overlayTriggerRef = useRef(null);
 
   useEffect(() => {
-    if (user) {
-      loadAllowance({ shouldPrompt: true });
+    const allowanceStatus = requestState.allowance.status;
+
+    if (
+      !userId ||
+      allowanceStatus === "idle" ||
+      allowanceStatus === "loading" ||
+      allowanceStatus === "error"
+    ) {
+      return;
     }
-  }, [user, loadAllowance]);
 
-  useEffect(() => {
-    if (user) {
-      loadExpenses();
+    const periodKey = `${currentAllowancePeriod.year}-${currentAllowancePeriod.month}`;
+    const sessionKey = `allowancePrompted:${userId}:${periodKey}`;
+    const hasPromptedThisSession =
+      allowancePromptPeriodRef.current === periodKey ||
+      (typeof window !== "undefined" &&
+        sessionStorage.getItem(sessionKey) === "true");
+
+    if (allowanceStatus === "missing" && !hasPromptedThisSession) {
+      setAllowanceModalOpen(true);
     }
-  }, [user, loadExpenses]);
 
-  useEffect(() => {
-    if (user) {
-      loadIncomes();
+    allowancePromptPeriodRef.current = periodKey;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(sessionKey, "true");
     }
-  }, [user, loadIncomes]);
+  }, [
+    currentAllowancePeriod.month,
+    currentAllowancePeriod.year,
+    requestState.allowance.status,
+    userId,
+  ]);
 
-  const handleDelete = async (id) => {
-    const { default: Swal } = await import("sweetalert2");
+  const rememberOverlayTrigger = () => {
+    if (
+      typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      overlayTriggerRef.current = document.activeElement;
+    }
+  };
 
-    const result = await Swal.fire({
-      title: "Yakin mau hapus?",
-      text: "Data pengeluaran ini tidak bisa dikembalikan.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+  const restoreOverlayTrigger = () => {
+    if (typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      const trigger = overlayTriggerRef.current;
+
+      if (trigger?.isConnected) {
+        trigger.focus();
+      } else {
+        document.getElementById("transaction-history")?.focus();
+      }
     });
+  };
 
-    if (!result.isConfirmed) return;
+  const handleSelectExpense = (expense) => {
+    rememberOverlayTrigger();
+    setSelectedExpense(expense);
+  };
 
-    const response = await authenticatedFetch("/api/expenses", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id }),
-    });
+  const handleCloseExpenseDetail = () => {
+    setSelectedExpense(null);
+    restoreOverlayTrigger();
+  };
 
-    if (response.ok) {
-      setExpenses((prev) => prev.filter((e) => e.id !== id));
-      setSelectedExpense(null);
-      loadAllowance();
+  const handleEditFromList = (expense) => {
+    rememberOverlayTrigger();
+    setEditingExpense(expense);
+  };
 
-      Swal.fire("Terhapus!", "Pengeluaran berhasil dihapus.", "success");
+  const handleEditFromDetail = (expense) => {
+    setSelectedExpense(null);
+    setEditingExpense(expense);
+  };
+
+  const handleCloseEdit = () => {
+    setEditingExpense(null);
+    restoreOverlayTrigger();
+  };
+
+  const handleZoomReceipt = (imageUrl) => {
+    setExpenseBehindZoom(selectedExpense);
+    setSelectedExpense(null);
+    setZoomImage(imageUrl);
+  };
+
+  const handleCloseZoom = () => {
+    setZoomImage(null);
+
+    if (expenseBehindZoom) {
+      setSelectedExpense(expenseBehindZoom);
+      setExpenseBehindZoom(null);
     } else {
-      const payload = await response.json().catch(() => ({}));
-      Swal.fire("Gagal!", "Gagal menghapus pengeluaran.", "error");
-      console.error("Failed deleting expense", payload);
+      restoreOverlayTrigger();
+    }
+  };
+
+  const handleDelete = (id) => {
+    const expense =
+      selectedExpense?.id === id
+        ? selectedExpense
+        : expenses?.find((item) => item.id === id) || null;
+    const restoreDetail = selectedExpense?.id === id;
+
+    if (restoreDetail) {
+      setSelectedExpense(null);
+    } else {
+      rememberOverlayTrigger();
+    }
+
+    setDeleteExpenseError("");
+    setExpenseDeletion({ expense, id, restoreDetail });
+  };
+
+  const handleCancelExpenseDelete = () => {
+    if (isDeletingExpense) return;
+
+    const pendingDeletion = expenseDeletion;
+    setExpenseDeletion(null);
+    setDeleteExpenseError("");
+
+    if (pendingDeletion?.restoreDetail && pendingDeletion.expense) {
+      setSelectedExpense(pendingDeletion.expense);
+    } else {
+      restoreOverlayTrigger();
+    }
+  };
+
+  const handleConfirmExpenseDelete = async () => {
+    if (!expenseDeletion || isDeletingExpense) return;
+
+    setIsDeletingExpense(true);
+    setDeleteExpenseError("");
+
+    try {
+      const response = await authenticatedFetch("/api/expenses", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: expenseDeletion.id }),
+      });
+
+      if (response.ok) {
+        removeExpense(expenseDeletion.id);
+        refreshAllowance();
+        setExpenseDeletion(null);
+        restoreOverlayTrigger();
+      } else {
+        const payload = await response.json().catch(() => ({}));
+        console.error("Failed deleting expense", payload);
+        setDeleteExpenseError(
+          payload.error || "Pengeluaran belum dapat dihapus. Coba lagi.",
+        );
+      }
+    } catch (error) {
+      console.error("Failed deleting expense", error);
+      setDeleteExpenseError("Pengeluaran belum dapat dihapus. Coba lagi.");
+    } finally {
+      setIsDeletingExpense(false);
     }
   };
 
   const handleUpdate = (updatedExpense) => {
-    setExpenses((prev) => prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e)));
-    loadAllowance();
+    replaceExpense(updatedExpense);
+    refreshAllowance();
   };
 
-  // Get current frequency from allowance (default to 'monthly')
-  const currentFrequency = allowance?.frequency || "monthly";
-  const periodLabel = getPeriodLabel(currentFrequency);
+  const handleCompleteProfile = async (fullName) => {
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: fullName.trim() },
+    });
 
-  // Calculate total expenses for the current period
-  const periodExpenses = useMemo(
-    () => getExpensesForPeriod(expenses, currentFrequency),
-    [expenses, currentFrequency]
-  );
-  const totalPeriodExpenses = useMemo(
-    () => periodExpenses.reduce((sum, e) => sum + e.amount, 0),
-    [periodExpenses]
-  );
-
-  const filteredExpenses = useMemo(() => {
-    let filtered = [...expenses];
-
-    // Filter bulan
-    if (filters.month) {
-      filtered = filtered.filter((e) => {
-        const d = new Date(e.date);
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        return m === filters.month;
-      });
+    if (error) {
+      console.error("Failed to save profile name", error.message);
+      throw new Error("Nama belum dapat disimpan. Coba lagi.");
     }
 
-    // Filter kategori
-    if (filters.category) {
-      filtered = filtered.filter((e) => e.category === filters.category);
-    }
+    setCompletedProfileUserId(userId);
+    router.refresh();
+  };
 
-    // Search
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      filtered = filtered.filter((e) => e.description?.toLowerCase().includes(q) || e.category.toLowerCase().includes(q));
-    }
+  const isInitialLoading =
+    requestState.expenses.status === "idle" ||
+    (requestState.expenses.status === "loading" && !Array.isArray(expenses));
+  const hasFullName = Boolean(user?.user_metadata?.full_name?.trim());
+  const showProfilePrompt =
+    Boolean(userId) &&
+    !hasFullName &&
+    dismissedProfileUserId !== userId &&
+    completedProfileUserId !== userId;
+  const baseAllowance = metrics.baseAllowanceDisplay;
 
-    // Sort
-    if (filters.sort === "date-desc") {
-      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-    } else if (filters.sort === "date-asc") {
-      filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
-    } else if (filters.sort === "amount-desc") {
-      filtered.sort((a, b) => b.amount - a.amount);
-    } else if (filters.sort === "amount-asc") {
-      filtered.sort((a, b) => a.amount - b.amount);
-    }
-
-    return filtered;
-  }, [expenses, filters]);
-
-  const totalExpenses = useMemo(
-    () => filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
-    [filteredExpenses]
-  );
-
-  const totalAdditionalIncome = useMemo(
-    () => additionalIncomes.reduce((sum, income) => sum + income.amount, 0),
-    [additionalIncomes]
-  );
-
-  const baseAllowance = useMemo(() => {
-    if (!allowance) return 0;
-    return Math.max(Number(allowance.amount) - totalAdditionalIncome, 0);
-  }, [allowance, totalAdditionalIncome]);
-
-  if (!isReady) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
-
-  if (loading) return <div className="flex items-center justify-center min-h-64">Loading...</div>;
-  
   return (
     <>
-      {!isMobile && <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <div className="flex gap-2">
-            <Link href="/income/add" className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-              Tambah Pendapatan
-            </Link>
-            <Link href="/add" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-              Tambah Pengeluaran
-            </Link>
-          </div>
-        </div>
+      <UnifiedDashboardPage
+        allowance={allowance}
+        availableExpensePeriods={availableExpensePeriods}
+        currentAllowancePeriod={currentAllowancePeriod}
+        expenses={expenses}
+        filteredExpenses={filteredExpenses}
+        filters={filters}
+        isInitialLoading={isInitialLoading}
+        metrics={metrics}
+        onCompleteProfile={handleCompleteProfile}
+        onDeleteExpense={handleDelete}
+        onDismissProfilePrompt={() => setDismissedProfileUserId(userId)}
+        onEditAllowance={() => setAllowanceModalOpen(true)}
+        onEditExpense={handleEditFromList}
+        onFilterChange={updateFilters}
+        onRetryAllowance={refreshAllowance}
+        onRetryExpenses={refreshExpenses}
+        onRetryIncomes={refreshIncomes}
+        onSelectExpense={handleSelectExpense}
+        requestState={requestState}
+        showProfilePrompt={showProfilePrompt}
+      />
 
-        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-emerald-700">Pendapatan tambahan bulan ini</p>
-            <p className="text-xl font-bold text-emerald-800">Rp {totalAdditionalIncome.toLocaleString()}</p>
-          </div>
-          <Link href="/income" className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-700">
-            Lihat Riwayat
-          </Link>
-        </div>
-
-        {/* 🔹 Allowance Info - Dynamic Label Based on Frequency */}
-        {allowance && (
-          <div className="bg-white p-6 shadow rounded-lg">
-            <h2 className="text-lg font-semibold text-gray-700">
-              Sisa Uang Saku {periodLabel}
-            </h2>
-            <p className="mt-2 text-2xl font-bold text-gray-900">Rp {allowance.remaining.toLocaleString()}</p>
-            <p className="text-sm text-gray-500">
-              Dari Rp {allowance.amount.toLocaleString()} ({currentFrequency === "weekly" ? "Mingguan" : "Bulanan"})
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              Uang saku awal: Rp {baseAllowance.toLocaleString()} | Pendapatan tambahan: Rp {totalAdditionalIncome.toLocaleString()}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              Total Pengeluaran {periodLabel}: Rp {totalPeriodExpenses.toLocaleString()}
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700" onClick={() => setOpen(true)}>
-                Atur
-              </button>
-              <Link href="/income" className="text-sm bg-emerald-600 text-white px-3 py-1 rounded-md hover:bg-emerald-700">
-                Pendapatan
-              </Link>
-            </div>
-          </div>
-        )}
-        {/* Summary Cards */}
-        <SummaryCards totalExpenses={totalExpenses} totalTransactions={filteredExpenses.length} allowanceTotal={allowance?.total || 0} allowanceRemaining={allowance?.remaining || 0} />
-
-        {/* Error */}
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
-          </div>
-        )}
-
-        {/* Filter Bar */}
-        <DashboardFilters categories={DEFAULT_EXPENSE_CATEGORIES} initialFilters={filters} onFilterChange={setFilters} />
-        {/* List */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Daftar Pengeluaran</h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">Pengeluaran terbaru Anda</p>
-          </div>
-          <div className="border-t border-gray-200">
-            {filteredExpenses.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">Belum ada pengeluaran</div>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {filteredExpenses.map((expense) => (
-                  <ExpenseListItem key={expense.id} expense={expense} onClick={setSelectedExpense} />
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>}
-
-      {isMobile && <div>
-        <MobileDashboard
-          user={user}
-          expenses={expenses}
-          additionalIncomes={additionalIncomes}
-          allowance={allowance}
-          onSelectExpense={setSelectedExpense}
-          onEditBudget={() => setOpen(true)}
+      {selectedExpense ? (
+        <ResponsiveExpenseDetailOverlay
+          expense={selectedExpense}
+          labels={DETAIL_LABELS}
+          onClose={handleCloseExpenseDetail}
+          onEdit={handleEditFromDetail}
+          onDelete={handleDelete}
+          onZoom={handleZoomReceipt}
         />
-      </div>}
+      ) : null}
 
-      {/* Modals */}
-      {selectedExpense && (
-        <>
-          {!isMobile && <div>
-            <ExpenseDetailModal
-              expense={selectedExpense}
-              onClose={() => setSelectedExpense(null)}
-              onEdit={setEditingExpense}
-              onDelete={handleDelete}
-              onZoom={setZoomImage}
-            />
-          </div>}
-          {isMobile && <div>
-            <MobileExpenseDetailSheet
-              expense={selectedExpense}
-              onClose={() => setSelectedExpense(null)}
-              onEdit={setEditingExpense}
-              onDelete={handleDelete}
-              onZoom={setZoomImage}
-            />
-          </div>}
-        </>
-      )}
+      {editingExpense ? (
+        <EditExpenseModal
+          expense={editingExpense}
+          onClose={handleCloseEdit}
+          onUpdate={handleUpdate}
+        />
+      ) : null}
 
-      {editingExpense && <EditExpenseModal expense={editingExpense} onClose={() => setEditingExpense(null)} onUpdate={handleUpdate} />}
+      {zoomImage ? (
+        <ImageZoomModal imageUrl={zoomImage} onClose={handleCloseZoom} />
+      ) : null}
 
-      {zoomImage && <ImageZoomModal imageUrl={zoomImage} onClose={() => setZoomImage(null)} />}
+      <ConfirmDialog
+        open={Boolean(expenseDeletion)}
+        title="Hapus pengeluaran?"
+        description={
+          expenseDeletion
+            ? `${
+                expenseDeletion.expense?.description?.trim() ||
+                expenseDeletion.expense?.category ||
+                "Pengeluaran ini"
+              } akan dihapus permanen dan sisa uang saku akan disesuaikan.`
+            : ""
+        }
+        confirmLabel="Hapus pengeluaran"
+        loadingLabel="Menghapus…"
+        isLoading={isDeletingExpense}
+        error={deleteExpenseError}
+        onClose={handleCancelExpenseDelete}
+        onConfirm={handleConfirmExpenseDelete}
+      />
 
       <AllowanceModal
-        isOpen={open}
-        onClose={() => setOpen(false)}
+        isOpen={allowanceModalOpen}
+        onClose={() => setAllowanceModalOpen(false)}
         onSaved={() => {
-          setOpen(false);
-          loadAllowance?.(); // refresh data di parent
+          setAllowanceModalOpen(false);
+          refreshAllowance();
         }}
-        initialAmount={allowance ? baseAllowance : 0}
+        initialAmount={allowance && baseAllowance !== null ? baseAllowance : 0}
         initialFrequency={allowance?.frequency || "monthly"}
       />
     </>
