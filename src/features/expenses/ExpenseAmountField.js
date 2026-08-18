@@ -10,7 +10,7 @@ export default function ExpenseAmountField({
   value,
 }) {
   return (
-    <section className="rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-primary-soft)] p-4 shadow-[var(--elevation-1)] sm:p-5">
+    <section className="bg-[var(--color-primary-soft)] p-4 sm:p-5">
       <FormField
         id="expense-amount"
         label="Jumlah"

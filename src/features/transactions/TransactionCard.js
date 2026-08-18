@@ -2,6 +2,7 @@ import { ChevronRight, Pencil, ReceiptText, Trash2 } from "lucide-react";
 
 import CurrencyAmount from "@/components/finance/CurrencyAmount";
 import Button from "@/components/ui/Button";
+import { getCategoryBadgeColor, getCategoryDotColor } from "@/lib/finance";
 import { formatDate } from "@/lib/utils";
 
 const wrappingAmountStyle = {
@@ -17,6 +18,8 @@ export default function TransactionCard({
   compact = false,
 }) {
   const description = transaction.description?.trim() || "Tanpa deskripsi";
+  const categoryBadgeClass = getCategoryBadgeColor(transaction.category);
+  const categoryDotClass = getCategoryDotColor(transaction.category);
 
   if (compact) {
     return (
@@ -26,8 +29,15 @@ export default function TransactionCard({
             {description}
           </p>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)]">
-            <span className="max-w-full truncate">{transaction.category}</span>
-            <span aria-hidden="true">·</span>
+            <span
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] px-2 py-0.5 text-xs font-semibold ${categoryBadgeClass}`}
+            >
+              <span
+                className={`size-1.5 shrink-0 rounded-[var(--radius-pill)] ${categoryDotClass}`}
+                aria-hidden="true"
+              />
+              <span className="truncate">{transaction.category}</span>
+            </span>
             <time dateTime={transaction.date}>
               {formatDate(transaction.date)}
             </time>
@@ -66,8 +76,15 @@ export default function TransactionCard({
             {description}
           </p>
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)]">
-            <span className="max-w-full break-words">{transaction.category}</span>
-            <span aria-hidden="true">·</span>
+            <span
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] px-2 py-0.5 text-xs font-semibold ${categoryBadgeClass}`}
+            >
+              <span
+                className={`size-1.5 shrink-0 rounded-[var(--radius-pill)] ${categoryDotClass}`}
+                aria-hidden="true"
+              />
+              <span className="truncate">{transaction.category}</span>
+            </span>
             <time dateTime={transaction.date}>{formatDate(transaction.date)}</time>
             {transaction.receipt_url ? (
               <span className="inline-flex items-center gap-1">

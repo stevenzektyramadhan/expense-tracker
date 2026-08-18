@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FilterX, Plus, RefreshCw } from "lucide-react";
+import { FilterX, Plus, ReceiptText, RefreshCw } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -124,19 +124,27 @@ export default function TransactionSection({
       aria-labelledby="transaction-history-title"
     >
       <div className="flex items-end justify-between gap-4 px-0 py-4 lg:border-b lg:border-[var(--color-border)] lg:px-5">
-        <div>
-          <h2
-            id="transaction-history-title"
-            className="font-[family-name:var(--font-display-family)] text-lg font-bold"
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]"
+            aria-hidden="true"
           >
-            Riwayat transaksi
-          </h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Pengeluaran sesuai filter yang dipilih
-          </p>
+            <ReceiptText className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              id="transaction-history-title"
+              className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold"
+            >
+              Riwayat transaksi
+            </h2>
+            <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
+              Pengeluaran sesuai filter yang dipilih
+            </p>
+          </div>
         </div>
         {requestState.status === "success" ? (
-          <p className="shrink-0 text-sm font-semibold text-[var(--color-text-muted)]">
+          <p className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2.5 py-1 text-sm font-semibold text-[var(--color-primary-strong)]">
             {transactions.length} transaksi
           </p>
         ) : null}
