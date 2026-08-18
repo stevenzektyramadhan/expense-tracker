@@ -10,18 +10,12 @@ import { PlusCircle, UserRound } from "lucide-react";
 import Button from "@/components/ui/Button";
 import FormField from "@/components/ui/FormField";
 import StatusBanner from "@/components/ui/StatusBanner";
-import CurrencyAmount from "@/components/finance/CurrencyAmount";
 import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";
 import DashboardFilters from "@/app/(dashboard)/components/DashboardFilters";
 import FinancialOverview from "./FinancialOverview";
 import RecentTransactions from "./RecentTransactions";
 import DashboardSkeleton from "./DashboardSkeleton";
 import TransactionSection from "@/features/transactions/TransactionSection";
-
-const wrappingAmountStyle = {
-  overflowWrap: "anywhere",
-  whiteSpace: "normal",
-};
 
 function ProfileCompletionPrompt({ onDismiss, onSave }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -124,46 +118,6 @@ function ProfileCompletionPrompt({ onDismiss, onSave }) {
         </form>
       ) : null}
     </StatusBanner>
-  );
-}
-
-function FilteredMetrics({ metrics, requestState }) {
-  if (requestState.expenses.status !== "success") return null;
-
-  return (
-    <section
-      className="grid gap-px overflow-hidden rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-border)] sm:grid-cols-3"
-      aria-labelledby="filtered-metrics-title"
-    >
-      <h2 id="filtered-metrics-title" className="sr-only">
-        Ringkasan hasil transaksi
-      </h2>
-
-      <div className="bg-[var(--color-surface)] p-4 sm:p-5">
-        <p className="text-sm text-[var(--color-text-muted)]">Total hasil</p>
-        <CurrencyAmount
-          amount={metrics.filteredExpenseTotal}
-          tone="expense"
-          showSign
-          className="mt-1 block text-lg font-bold"
-          style={wrappingAmountStyle}
-        />
-      </div>
-      <div className="bg-[var(--color-surface)] p-4 sm:p-5">
-        <p className="text-sm text-[var(--color-text-muted)]">Jumlah transaksi</p>
-        <p className="mt-1 text-lg font-bold [font-variant-numeric:tabular-nums]">
-          {metrics.filteredTransactionCount}
-        </p>
-      </div>
-      <div className="bg-[var(--color-surface)] p-4 sm:p-5">
-        <p className="text-sm text-[var(--color-text-muted)]">Rata-rata transaksi</p>
-        <CurrencyAmount
-          amount={Math.round(metrics.filteredAverageTransaction || 0)}
-          className="mt-1 block text-lg font-bold"
-          style={wrappingAmountStyle}
-        />
-      </div>
-    </section>
   );
 }
 
@@ -326,10 +280,6 @@ export default function DashboardPage({
           onResetFilters={resetFilters}
           onRetry={onRetryExpenses}
         />
-      </div>
-
-      <div className="order-8 min-w-0 md:col-span-2">
-        <FilteredMetrics metrics={metrics} requestState={requestState} />
       </div>
     </div>
   );

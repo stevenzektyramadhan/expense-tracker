@@ -60,22 +60,26 @@ export default function ExpenseForm() {
         className="group/expense-form space-y-4"
         aria-describedby={requestError ? "expense-request-error" : undefined}
       >
-        <ExpenseAmountField
-          inputRef={amountRef}
-          value={values.amount}
-          onChange={handleAmountChange}
-          error={fieldErrors.amount}
-          disabled={isSubmitting}
-        />
+        <div className="overflow-hidden rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--elevation-1)]">
+          <ExpenseAmountField
+            inputRef={amountRef}
+            value={values.amount}
+            onChange={handleAmountChange}
+            error={fieldErrors.amount}
+            disabled={isSubmitting}
+          />
 
-        <CategoryPicker
-          category={values.category}
-          categoryRef={categoryRef}
-          onChoiceChange={handleCategoryChoiceChange}
-          onCustomChange={handleCustomCategoryChange}
-          error={fieldErrors.category}
-          disabled={isSubmitting}
-        />
+          <div className="border-t border-[var(--color-border)]">
+            <CategoryPicker
+              category={values.category}
+              categoryRef={categoryRef}
+              onChoiceChange={handleCategoryChoiceChange}
+              onCustomChange={handleCustomCategoryChange}
+              error={fieldErrors.category}
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
 
         <details
           open={detailsOpen}

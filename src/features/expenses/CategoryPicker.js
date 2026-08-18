@@ -11,7 +11,7 @@ export default function CategoryPicker({
   onCustomChange,
 }) {
   return (
-    <section className="rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+    <section className="bg-[var(--color-surface)] p-4 sm:p-5">
       <FormField
         id="expense-category"
         label="Kategori"

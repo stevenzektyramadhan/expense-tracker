@@ -4,7 +4,7 @@
  * Hallmark · genre: modern-minimal · macrostructure: Index-First · design-system: Calm Ledger · designed-as-app
  */
 import dynamic from "next/dynamic";
-import { BarChart3, CalendarRange } from "lucide-react";
+import { BarChart3, CalendarDays, CalendarRange, PieChart } from "lucide-react";
 
 import CurrencyAmount from "@/components/finance/CurrencyAmount";
 import FormField from "@/components/ui/FormField";
@@ -85,14 +85,23 @@ export default function MonthlySummary({
         className="grid min-w-0 gap-4 rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--elevation-1)] md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-end md:p-5"
         aria-labelledby="summary-period-heading"
       >
-        <div className="min-w-0">
-          <h2
-            id="summary-period-heading"
-            className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]"
+            aria-hidden="true"
           >
-            Periode laporan
-          </h2>
-          <FormField
+            <CalendarDays className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              id="summary-period-heading"
+              className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
+            >
+              Periode laporan
+            </h2>
+          </div>
+        </div>
+        <FormField
             id="summary-month-filter"
             label="Bulan"
             helperText="Pilih bulan yang ingin ditinjau."
@@ -109,7 +118,6 @@ export default function MonthlySummary({
               ))}
             </select>
           </FormField>
-        </div>
 
         <div className="min-w-0 border-t border-[var(--color-border)] pt-4 md:border-l md:border-t-0 md:pb-5 md:pl-5 md:pt-0">
           <p className="text-sm text-[var(--color-text-muted)]">
@@ -133,29 +141,45 @@ export default function MonthlySummary({
           className="min-w-0 rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5"
           aria-labelledby="category-ranking-heading"
         >
-          <div className="mb-4 min-w-0">
-            <h2
-              id="category-ranking-heading"
-              className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
+          <div className="mb-4 flex min-w-0 items-center gap-3">
+            <span
+              className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]"
+              aria-hidden="true"
             >
-              Pengeluaran per kategori
-            </h2>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Diurutkan dari pengeluaran terbesar pada {selectedLabel}.
-            </p>
+              <BarChart3 className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2
+                id="category-ranking-heading"
+                className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
+              >
+                Pengeluaran per kategori
+              </h2>
+              <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
+                Diurutkan dari pengeluaran terbesar pada {selectedLabel}.
+              </p>
+            </div>
           </div>
 
           <RankedCategoryList categories={categories} />
         </section>
 
         <figure className="min-w-0 rounded-[var(--radius-surface)] bg-[var(--color-surface-subtle)] p-4 sm:p-5">
-          <div className="min-w-0">
-            <h2 className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]">
-              Proporsi kategori
-            </h2>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Visual pendukung dari peringkat di samping.
-            </p>
+          <div className="mb-4 flex min-w-0 items-center gap-3">
+            <span
+              className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-surface-raised)] text-[var(--color-primary-strong)]"
+              aria-hidden="true"
+            >
+              <PieChart className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]">
+                Proporsi kategori
+              </h2>
+              <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
+                Visual pendukung dari peringkat di samping.
+              </p>
+            </div>
           </div>
 
           <CategoryDonutChart categories={categories} />
