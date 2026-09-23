@@ -47,18 +47,22 @@ function IncomeCard({ income, onDelete, onEdit }) {
             <h3 className="break-words font-semibold leading-snug text-[var(--color-text)]">
               {source}
             </h3>
-            <time
-              dateTime={income.date}
-              className="mt-1 block text-sm text-[var(--color-text-muted)]"
-            >
-              {formatDate(income.date)}
-            </time>
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)]">
+              <span className="inline-flex max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--color-income-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--color-income-strong)]">
+                <span
+                  className="size-1.5 shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-income)]"
+                  aria-hidden="true"
+                />
+                <span>Pendapatan</span>
+              </span>
+              <time dateTime={income.date}>{formatDate(income.date)}</time>
+            </div>
           </div>
           <CurrencyAmount
             amount={income.amount}
             tone="income"
             showSign
-            className="max-w-[52%] shrink-0 break-words text-right font-bold"
+            className="max-w-[46%] shrink-0 break-words text-right text-base font-bold"
             style={wrappingAmountStyle}
           />
         </div>
