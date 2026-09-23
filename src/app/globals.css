@@ -465,6 +465,10 @@ textarea.ui-form-control {
   background: var(--color-expense-soft);
 }
 
+.ui-status-banner[data-tone="offline"] {
+  background: var(--color-surface-subtle);
+}
+
 .ui-status-banner__icon {
   width: 1.5rem;
   height: 1.5rem;
@@ -488,6 +492,10 @@ textarea.ui-form-control {
 
 .ui-status-banner[data-tone="error"] .ui-status-banner__icon {
   color: var(--color-expense-strong);
+}
+
+.ui-status-banner[data-tone="offline"] .ui-status-banner__icon {
+  color: var(--color-text-muted);
 }
 
 .ui-status-banner__icon svg {

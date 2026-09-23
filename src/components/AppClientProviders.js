@@ -1,6 +1,7 @@
 "use client";
 
 import { Toaster } from "react-hot-toast";
+import OfflineBanner from "@/components/OfflineBanner";
 import UpdatePrompt from "@/components/UpdatePrompt";
 
 export default function AppClientProviders() {
@@ -37,6 +38,7 @@ export default function AppClientProviders() {
           },
         }}
       />
+      <OfflineBanner />
       <UpdatePrompt />
     </>
   );
