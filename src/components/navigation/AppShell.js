@@ -18,7 +18,7 @@ import { signOut } from "@/lib/supabaseClient";
 
 const NAVIGATION_ROUTES = [
   { href: "/", label: "Beranda", Icon: Home },
-  { href: "/add", label: "Tambah", Icon: PlusCircle },
+  { href: "/add", label: "Pengeluaran", Icon: PlusCircle },
   { href: "/income", label: "Pendapatan", Icon: Wallet },
   { href: "/summary", label: "Ringkasan", Icon: BarChart3 },
 ];
@@ -111,6 +111,8 @@ export default function AppShell({ children, isLoading = false, user }) {
             isLoading={isLoading}
             routeLabel={isLoading ? "Memuat aplikasi" : routeTitle}
             user={user}
+            onLogout={handleLogout}
+            isLoggingOut={isLoggingOut}
           />
           {isLoading ? null : (
             <DesktopNavigation
@@ -147,11 +149,7 @@ export default function AppShell({ children, isLoading = false, user }) {
       </main>
 
       {isLoading ? null : (
-        <MobileBottomNav
-          routes={routes}
-          onLogout={handleLogout}
-          isLoggingOut={isLoggingOut}
-        />
+        <MobileBottomNav routes={routes} />
       )}
 
       <ConfirmDialog

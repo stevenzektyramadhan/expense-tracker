@@ -13,7 +13,6 @@ import StatusBanner from "@/components/ui/StatusBanner";
 import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";
 import DashboardFilters from "@/app/(dashboard)/components/DashboardFilters";
 import FinancialOverview from "./FinancialOverview";
-import RecentTransactions from "./RecentTransactions";
 import DashboardSkeleton from "./DashboardSkeleton";
 import TransactionSection from "@/features/transactions/TransactionSection";
 
@@ -237,19 +236,8 @@ export default function DashboardPage({
         </Link>
       </div>
 
-      <div className="order-4 min-w-0 md:col-span-2">
-        <RecentTransactions
-          transactions={safeFilteredExpenses}
-          requestStatus={requestState.expenses.status}
-          filtersAreActive={filtersAreActive}
-          onSelect={onSelectExpense}
-          onEdit={onEditExpense}
-          onDelete={onDeleteExpense}
-        />
-      </div>
-
       {showProfilePrompt ? (
-        <div className="order-5 min-w-0 md:col-span-2">
+        <div className="order-4 min-w-0 md:col-span-2">
           <ProfileCompletionPrompt
             onDismiss={onDismissProfilePrompt}
             onSave={onCompleteProfile}
@@ -257,7 +245,7 @@ export default function DashboardPage({
         </div>
       ) : null}
 
-      <div className="order-6 min-w-0 md:col-span-2">
+      <div className="order-5 min-w-0 md:col-span-2">
         <DashboardFilters
           categories={categories}
           filters={filters}
@@ -268,7 +256,7 @@ export default function DashboardPage({
         />
       </div>
 
-      <div className="order-7 min-w-0 md:col-span-2">
+      <div className="order-6 min-w-0 md:col-span-2">
         <TransactionSection
           transactions={safeFilteredExpenses}
           hasAnyTransactions={safeExpenses.length > 0}
