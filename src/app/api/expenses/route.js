@@ -7,6 +7,8 @@
 
 // Import our Prisma singleton - this ensures we reuse the same database connection
 import prisma from "@/lib/prisma";
+import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
+import { resolveOwnedReceipt } from "@/lib/receiptAsset";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 const clampRemainingBalance = (value, allowanceAmount) => {
@@ -38,11 +40,13 @@ const parseDateBoundary = (value, { inclusiveEnd = false } = {}) => {
 // =============================================================================
 export async function POST(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     // Parse the JSON body from the request
-    const { amount, description, category, date, receipt_url } = await req.json();
+    const { amount, description, category, date, receipt_public_id } = await req.json();
 
     if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
       return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
@@ -54,6 +58,20 @@ export async function POST(req) {
       return new Response(JSON.stringify({ error: "category and date are required" }), {
         status: 400,
       });
+    }
+
+    let receipt = null;
+    if (receipt_public_id !== undefined && receipt_public_id !== null) {
+      if (!receipt_public_id || typeof receipt_public_id !== "string") {
+        return new Response(JSON.stringify({ error: "receipt_public_id is invalid" }), { status: 400 });
+      }
+
+      receipt = await resolveOwnedReceipt(receipt_public_id, user.id);
+      if (!receipt) {
+        return new Response(JSON.stringify({ error: "Receipt is invalid or does not belong to this user" }), {
+          status: 400,
+        });
+      }
     }
 
     // Get current month and year for finding the active allowance
@@ -139,7 +157,8 @@ export async function POST(req) {
           category: category,
           date: new Date(date),        // Convert date string to Date object
           allowance_id: allowance.id,  // Link expense to the allowance
-          receipt_url: receipt_url,    // Store receipt image URL (can be null)
+          receipt_url: receipt?.secureUrl || null,
+          receipt_public_id: receipt?.publicId || null,
           // createdAt is auto-set by database default
         },
       });
@@ -227,8 +246,10 @@ export async function GET(req) {
 // - Reject if updated amount would make balance negative
 export async function PUT(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     const { id, amount, category, date, description } = await req.json();
 
@@ -329,8 +350,10 @@ export async function PUT(req) {
 // - If linked to an allowance, add amount back to allowance.remaining
 export async function DELETE(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     const { id } = await req.json();
 

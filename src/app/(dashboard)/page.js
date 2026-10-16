@@ -58,14 +58,19 @@ export default function DashboardRoute() {
     allowance,
     expenses,
     filters,
+    frequentExpenseCategories,
+    spendingInsights,
     updateFilters,
-    filteredExpenses,
+    displayedExpenses,
+    discoveryResult,
+    discoveryPending,
     availableExpensePeriods,
     currentAllowancePeriod,
     metrics,
     requestState,
     refreshAllowance,
     refreshExpenses,
+    refreshDiscovery,
     refreshIncomes,
     removeExpense,
     replaceExpense,
@@ -231,6 +236,7 @@ export default function DashboardRoute() {
       if (response.ok) {
         removeExpense(expenseDeletion.id);
         refreshAllowance();
+        refreshDiscovery();
         setExpenseDeletion(null);
         restoreOverlayTrigger();
       } else {
@@ -251,6 +257,13 @@ export default function DashboardRoute() {
   const handleUpdate = (updatedExpense) => {
     replaceExpense(updatedExpense);
     refreshAllowance();
+    refreshDiscovery();
+  };
+
+  const handleExpenseCreated = () => {
+    refreshAllowance();
+    refreshExpenses();
+    refreshDiscovery();
   };
 
   const handleCompleteProfile = async (fullName) => {
@@ -269,7 +282,9 @@ export default function DashboardRoute() {
 
   const isInitialLoading =
     requestState.expenses.status === "idle" ||
-    (requestState.expenses.status === "loading" && !Array.isArray(expenses));
+    requestState.discovery.status === "idle" ||
+    (requestState.expenses.status === "loading" && !Array.isArray(expenses)) ||
+    (requestState.discovery.status === "loading" && !Array.isArray(displayedExpenses));
   const hasFullName = Boolean(user?.user_metadata?.full_name?.trim());
   const showProfilePrompt =
     Boolean(userId) &&
@@ -285,8 +300,12 @@ export default function DashboardRoute() {
         availableExpensePeriods={availableExpensePeriods}
         currentAllowancePeriod={currentAllowancePeriod}
         expenses={expenses}
-        filteredExpenses={filteredExpenses}
+        displayedExpenses={displayedExpenses}
+        discoveryResult={discoveryResult}
+        discoveryPending={discoveryPending}
         filters={filters}
+        frequentExpenseCategories={frequentExpenseCategories}
+        spendingInsights={spendingInsights}
         isInitialLoading={isInitialLoading}
         metrics={metrics}
         onCompleteProfile={handleCompleteProfile}
@@ -294,13 +313,16 @@ export default function DashboardRoute() {
         onDismissProfilePrompt={() => setDismissedProfileUserId(userId)}
         onEditAllowance={() => setAllowanceModalOpen(true)}
         onEditExpense={handleEditFromList}
+        onExpenseCreated={handleExpenseCreated}
         onFilterChange={updateFilters}
         onRetryAllowance={refreshAllowance}
         onRetryExpenses={refreshExpenses}
+        onRetryDiscovery={refreshDiscovery}
         onRetryIncomes={refreshIncomes}
         onSelectExpense={handleSelectExpense}
         requestState={requestState}
         showProfilePrompt={showProfilePrompt}
+        userId={userId}
       />
 
       {selectedExpense ? (

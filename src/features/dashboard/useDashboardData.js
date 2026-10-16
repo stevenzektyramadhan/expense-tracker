@@ -5,10 +5,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import {
   createDashboardFilters,
+  createExpenseDiscoveryQuery,
+  areDashboardFiltersEqual,
   normalizeDashboardFilters,
+  normalizeExpenseDiscoveryPayload,
   selectAvailableExpensePeriods,
   selectDashboardMetrics,
   selectFilteredTransactions,
+  selectFrequentExpenseCategories,
+  selectLargestMonthlyExpenseCategory,
+  selectSevenDayExpenseComparison,
 } from "./dashboardSelectors";
 
 const REQUEST_IDLE = "idle";
@@ -72,11 +78,15 @@ const getVisibleRequestState = (requestState, userId) => {
   };
 };
 
+const DISCOVERY_LIMIT = 20;
+const DISCOVERY_SEARCH_DEBOUNCE_MS = 250;
+
 export default function useDashboardData({ userId }) {
   const [referenceDate] = useState(() => new Date());
   const [filters, setFilters] = useState(() =>
     createDashboardFilters(referenceDate)
   );
+  const [discoveryFilters, setDiscoveryFilters] = useState(filters);
 
   const [allowanceResource, setAllowanceResource] = useState({
     userId: null,
@@ -97,12 +107,22 @@ export default function useDashboardData({ userId }) {
   const [expenseRequest, setExpenseRequest] = useState(() =>
     createRequestState(null)
   );
+  const [discoveryResource, setDiscoveryResource] = useState({
+    userId: null,
+    data: null,
+    returned: 0,
+    total: 0,
+  });
+  const [discoveryRequest, setDiscoveryRequest] = useState(() =>
+    createRequestState(null)
+  );
   const [incomeRequest, setIncomeRequest] = useState(() =>
     createRequestState(null)
   );
 
   const allowanceRequestRef = useRef({ sequence: 0, controller: null });
   const expenseRequestRef = useRef({ sequence: 0, controller: null });
+  const discoveryRequestRef = useRef({ sequence: 0, controller: null });
   const incomeRequestRef = useRef({ sequence: 0, controller: null });
 
   const currentAllowancePeriod = useMemo(
@@ -217,6 +237,54 @@ export default function useDashboardData({ userId }) {
     }
   }, [userId]);
 
+  const loadExpenseDiscovery = useCallback(async () => {
+    if (!userId) return;
+
+    const { sequence, controller } = beginRequest(discoveryRequestRef);
+    const query = createExpenseDiscoveryQuery(
+      discoveryFilters,
+      DISCOVERY_LIMIT
+    );
+    setDiscoveryRequest(createRequestState(userId, REQUEST_LOADING));
+
+    try {
+      const response = await authenticatedFetch(
+        `/api/expenses/discovery?${query}`,
+        { signal: controller.signal }
+      );
+      const payload = await response.json().catch(() => null);
+
+      if (!isCurrentRequest(discoveryRequestRef, sequence, controller)) return;
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Gagal memuat transaksi");
+      }
+
+      const normalizedPayload = normalizeExpenseDiscoveryPayload(payload);
+      if (!normalizedPayload) {
+        throw new Error("Respons transaksi tidak valid");
+      }
+
+      setDiscoveryResource({ userId, ...normalizedPayload });
+      setDiscoveryRequest(createRequestState(userId, REQUEST_SUCCESS));
+    } catch (error) {
+      if (
+        isAbortedRequest(error, controller) ||
+        !isCurrentRequest(discoveryRequestRef, sequence, controller)
+      ) {
+        return;
+      }
+
+      setDiscoveryRequest(
+        createRequestState(
+          userId,
+          REQUEST_ERROR,
+          getErrorMessage(error, "Gagal memuat transaksi")
+        )
+      );
+    }
+  }, [discoveryFilters, userId]);
+
   const loadIncomes = useCallback(async () => {
     if (!userId) return;
 
@@ -295,6 +363,29 @@ export default function useDashboardData({ userId }) {
 
   useEffect(() => {
     if (!userId) {
+      cancelRequest(discoveryRequestRef);
+      setDiscoveryResource({
+        userId: null,
+        data: null,
+        returned: 0,
+        total: 0,
+      });
+      setDiscoveryRequest(createRequestState(null));
+      return undefined;
+    }
+
+    setDiscoveryResource((currentResource) =>
+      currentResource.userId === userId
+        ? currentResource
+        : { userId, data: null, returned: 0, total: 0 }
+    );
+    loadExpenseDiscovery();
+
+    return () => cancelRequest(discoveryRequestRef);
+  }, [discoveryFilters, loadExpenseDiscovery, userId]);
+
+  useEffect(() => {
+    if (!userId) {
       cancelRequest(incomeRequestRef);
       setIncomeResource({ userId: null, data: null });
       setIncomeRequest(createRequestState(null));
@@ -312,12 +403,18 @@ export default function useDashboardData({ userId }) {
     userId
   );
   const visibleExpenseRequest = getVisibleRequestState(expenseRequest, userId);
+  const visibleDiscoveryRequest = getVisibleRequestState(
+    discoveryRequest,
+    userId
+  );
   const visibleIncomeRequest = getVisibleRequestState(incomeRequest, userId);
 
   const allowance =
     allowanceResource.userId === userId ? allowanceResource.data : null;
   const expenses =
     expenseResource.userId === userId ? expenseResource.data : null;
+  const discoveryResultResource =
+    discoveryResource.userId === userId ? discoveryResource : null;
   const additionalIncomes =
     incomeResource.userId === userId ? incomeResource.data : null;
 
@@ -329,11 +426,24 @@ export default function useDashboardData({ userId }) {
             ? nextFilters(currentFilters)
             : { ...currentFilters, ...nextFilters };
 
-        return normalizeDashboardFilters(resolvedFilters, referenceDate);
+        const normalizedFilters = normalizeDashboardFilters(
+          resolvedFilters,
+          referenceDate
+        );
+        return normalizedFilters;
       });
     },
     [referenceDate]
   );
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDiscoveryFilters(filters);
+    },
+    filters.search === discoveryFilters.search ? 0 : DISCOVERY_SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [discoveryFilters.search, filters]);
 
   const filteredExpenses = useMemo(
     () =>
@@ -342,6 +452,27 @@ export default function useDashboardData({ userId }) {
         : [],
     [expenses, filters, visibleExpenseRequest.status]
   );
+
+  const frequentExpenseCategories = useMemo(
+    () =>
+      visibleExpenseRequest.status === REQUEST_SUCCESS
+        ? selectFrequentExpenseCategories(expenses, referenceDate)
+        : [],
+    [expenses, referenceDate, visibleExpenseRequest.status]
+  );
+
+  const spendingInsights = useMemo(() => {
+    if (visibleExpenseRequest.status !== REQUEST_SUCCESS) {
+      return { largestCategory: null, sevenDayComparison: null };
+    }
+
+    return {
+      largestCategory: selectLargestMonthlyExpenseCategory(expenses, referenceDate),
+      sevenDayComparison: selectSevenDayExpenseComparison(expenses, referenceDate),
+    };
+  }, [expenses, referenceDate, visibleExpenseRequest.status]);
+
+  const displayedExpenses = discoveryResultResource?.data ?? null;
 
   const availableExpensePeriods = useMemo(
     () => selectAvailableExpensePeriods(expenses, referenceDate),
@@ -415,8 +546,13 @@ export default function useDashboardData({ userId }) {
   );
 
   const refreshDashboard = useCallback(() => {
-    return Promise.all([loadAllowance(), loadExpenses(), loadIncomes()]);
-  }, [loadAllowance, loadExpenses, loadIncomes]);
+    return Promise.all([
+      loadAllowance(),
+      loadExpenses(),
+      loadIncomes(),
+      loadExpenseDiscovery(),
+    ]);
+  }, [loadAllowance, loadExpenses, loadIncomes, loadExpenseDiscovery]);
 
   return {
     allowance,
@@ -425,16 +561,28 @@ export default function useDashboardData({ userId }) {
     filters,
     updateFilters,
     filteredExpenses,
+    frequentExpenseCategories,
+    spendingInsights,
+    displayedExpenses,
+    discoveryPending:
+      visibleDiscoveryRequest.status === REQUEST_LOADING ||
+      !areDashboardFiltersEqual(filters, discoveryFilters),
+    discoveryResult: {
+      returned: discoveryResultResource?.returned ?? 0,
+      total: discoveryResultResource?.total ?? 0,
+    },
     availableExpensePeriods,
     currentAllowancePeriod,
     metrics,
     requestState: {
       allowance: visibleAllowanceRequest,
       expenses: visibleExpenseRequest,
+      discovery: visibleDiscoveryRequest,
       incomes: visibleIncomeRequest,
     },
     refreshAllowance: loadAllowance,
     refreshExpenses: loadExpenses,
+    refreshDiscovery: loadExpenseDiscovery,
     refreshIncomes: loadIncomes,
     refreshDashboard,
     removeExpense,

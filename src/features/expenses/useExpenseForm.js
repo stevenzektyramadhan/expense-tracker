@@ -155,14 +155,14 @@ async function uploadReceipt(file) {
     );
   }
 
-  if (!payload.url) {
+  if (!payload.url || !payload.public_id) {
     throw new ExpenseSubmissionError(
       "upload",
       "Struk gagal diunggah. Coba lagi.",
     );
   }
 
-  return payload.url;
+  return { publicId: payload.public_id, url: payload.url };
 }
 
 async function createExpense(payload) {
@@ -213,7 +213,11 @@ function createPayloadSignature(values, resolvedCategory) {
   });
 }
 
-export default function useExpenseForm() {
+export default function useExpenseForm({
+  onCancel,
+  onSuccess,
+  onSubmittingChange,
+} = {}) {
   const router = useRouter();
   const [values, setValues] = useState(createInitialValues);
   const [receipt, setReceipt] = useState(null);
@@ -489,6 +493,8 @@ export default function useExpenseForm() {
     if (!validate()) return;
 
     submissionLockRef.current = true;
+    setSubmitPhase("preparing");
+    onSubmittingChange?.(true);
     let currentPhase = "preparing";
     let payloadSignature = "";
     let sessionIdentity = null;
@@ -496,7 +502,7 @@ export default function useExpenseForm() {
     try {
       sessionIdentity = await readSessionIdentity();
       payloadSignature = createPayloadSignature(values, resolvedCategory);
-      let receiptUrl = null;
+      let uploadedReceipt = null;
 
       if (receipt) {
         const cachedUpload = uploadedReceiptCacheRef.current;
@@ -507,7 +513,7 @@ export default function useExpenseForm() {
           cachedUpload.payloadSignature === payloadSignature;
 
         if (canReuseUploadedReceipt) {
-          receiptUrl = cachedUpload.url;
+          uploadedReceipt = cachedUpload.receipt;
           cachedUpload.retryable = false;
         } else {
           invalidateUploadedReceiptCache();
@@ -521,13 +527,13 @@ export default function useExpenseForm() {
 
           currentPhase = "uploading";
           setSubmitPhase("uploading");
-          receiptUrl = await uploadReceipt(compressionResult.file);
+          uploadedReceipt = await uploadReceipt(compressionResult.file);
           uploadedReceiptCacheRef.current = {
             file: receipt,
             payloadSignature,
             retryable: false,
             sessionIdentity,
-            url: receiptUrl,
+            receipt: uploadedReceipt,
           };
         }
       }
@@ -539,13 +545,17 @@ export default function useExpenseForm() {
         category: resolvedCategory,
         date: values.date,
         description: values.description,
-        receipt_url: receiptUrl,
+        receipt_public_id: uploadedReceipt?.publicId || null,
       });
 
       invalidateUploadedReceiptCache();
       resetForm();
       toast.success("Pengeluaran berhasil disimpan!");
-      router.push("/");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/");
+      }
     } catch (error) {
       const submissionError = getSubmissionError(error, currentPhase);
       const cachedUpload = uploadedReceiptCacheRef.current;
@@ -572,6 +582,7 @@ export default function useExpenseForm() {
       submissionLockRef.current = false;
       if (mountedRef.current) {
         setSubmitPhase("idle");
+        onSubmittingChange?.(false);
       }
     }
   };
@@ -579,7 +590,11 @@ export default function useExpenseForm() {
   const handleCancel = () => {
     if (submissionLockRef.current) return;
     resetForm();
-    router.push("/");
+    if (onCancel) {
+      onCancel();
+    } else {
+      router.push("/");
+    }
   };
 
   return {

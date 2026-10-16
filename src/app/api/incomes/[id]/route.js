@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 const resolveAllowanceForDate = async (tx, userId, date) => {
@@ -74,8 +75,10 @@ const applyAllowanceDelta = async (tx, allowanceId, delta) => {
 
 export async function PUT(req, { params }) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     const resolvedParams = await params;
     const incomeId = resolvedParams?.id;
@@ -188,8 +191,10 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     const resolvedParams = await params;
     const incomeId = resolvedParams?.id;

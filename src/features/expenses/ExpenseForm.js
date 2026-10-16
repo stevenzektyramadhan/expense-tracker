@@ -16,7 +16,12 @@ const PHASE_MESSAGES = {
   creating: "Menyimpan pengeluaran…",
 };
 
-export default function ExpenseForm() {
+export default function ExpenseForm({
+  onCancel,
+  onSuccess,
+  onSubmittingChange,
+  frequentExpenseCategories = [],
+}) {
   const {
     amountRef,
     categoryRef,
@@ -40,7 +45,7 @@ export default function ExpenseForm() {
     setDetailsOpen,
     submitPhase,
     values,
-  } = useExpenseForm();
+  } = useExpenseForm({ onCancel, onSuccess, onSubmittingChange });
   const phaseMessage = PHASE_MESSAGES[submitPhase] || "";
 
   return (
@@ -74,7 +79,8 @@ export default function ExpenseForm() {
               category={values.category}
               categoryRef={categoryRef}
               onChoiceChange={handleCategoryChoiceChange}
-              onCustomChange={handleCustomCategoryChange}
+               onCustomChange={handleCustomCategoryChange}
+               frequentCategories={frequentExpenseCategories}
               error={fieldErrors.category}
               disabled={isSubmitting}
             />

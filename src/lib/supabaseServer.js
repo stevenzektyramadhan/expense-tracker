@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { selectAuthenticatedUser } from "@/lib/mutationSecurity.mjs";
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
@@ -48,16 +49,6 @@ const getBearerToken = (request) => {
 };
 
 export async function requireAuthenticatedUser(request) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (!error && user) {
-    return { user, errorResponse: null };
-  }
-
   const bearerToken = getBearerToken(request);
   if (bearerToken) {
     const {
@@ -66,12 +57,23 @@ export async function requireAuthenticatedUser(request) {
     } = await supabasePublicClient.auth.getUser(bearerToken);
 
     if (!bearerError && bearerUser) {
-      return { user: bearerUser, errorResponse: null };
+      return { ...selectAuthenticatedUser(bearerUser, null), errorResponse: null };
     }
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (!error && user) {
+    return { ...selectAuthenticatedUser(null, user), errorResponse: null };
   }
 
   return {
     user: null,
+    authMethod: null,
     errorResponse: new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
     }),

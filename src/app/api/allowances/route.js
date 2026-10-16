@@ -7,6 +7,7 @@
 
 // Import our Prisma singleton - this ensures we reuse the same database connection
 import prisma from "@/lib/prisma";
+import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 const ALLOWED_FREQUENCIES = new Set(["weekly", "monthly"]);
@@ -30,8 +31,10 @@ const getCurrentPeriod = () => {
 // =============================================================================
 export async function POST(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     // Parse the JSON body from the request
     // amount: The budget amount for the month (Decimal in database)
@@ -143,8 +146,10 @@ export async function GET(req) {
 // is preserved by adding it to the stored total allowance amount.
 export async function PUT(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     const { amount, frequency = "monthly" } = await req.json();
 

@@ -5,6 +5,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import { DEFAULT_EXPENSE_CATEGORIES } from "../../lib/finance.js";
 
 export const DASHBOARD_PERIOD_ALL = "all";
 export const DASHBOARD_PERIOD_MONTH = "month";
@@ -51,6 +52,53 @@ export const parseLocalDashboardDate = (value) => {
   return new Date(value);
 };
 
+export const selectFrequentExpenseCategories = (
+  expenses,
+  referenceDate,
+  maxResults = 4
+) => {
+  if (!Array.isArray(expenses)) return [];
+
+  const endDate = parseLocalDashboardDate(referenceDate);
+  if (Number.isNaN(endDate.getTime())) return [];
+
+  const startDate = new Date(endDate.getTime());
+  startDate.setHours(0, 0, 0, 0);
+  startDate.setDate(startDate.getDate() - 89);
+  endDate.setHours(23, 59, 59, 999);
+
+  const categoryStats = new Map();
+  expenses.forEach((expense) => {
+    const category = expense?.category;
+    const date = parseLocalDashboardDate(expense?.date);
+    if (
+      !DEFAULT_EXPENSE_CATEGORIES.includes(category) ||
+      Number.isNaN(date.getTime()) ||
+      date < startDate ||
+      date > endDate
+    ) {
+      return;
+    }
+
+    const current = categoryStats.get(category) || { count: 0, mostRecent: 0 };
+    categoryStats.set(category, {
+      count: current.count + 1,
+      mostRecent: Math.max(current.mostRecent, date.getTime()),
+    });
+  });
+
+  return Array.from(categoryStats.entries())
+    .sort(([leftCategory, left], [rightCategory, right]) => {
+      return (
+        right.count - left.count ||
+        right.mostRecent - left.mostRecent ||
+        leftCategory.localeCompare(rightCategory, "id-ID")
+      );
+    })
+    .slice(0, maxResults)
+    .map(([category]) => category);
+};
+
 export const createDashboardFilters = (referenceDate) => {
   const date = parseLocalDashboardDate(referenceDate);
 
@@ -85,6 +133,44 @@ export const normalizeDashboardFilters = (filters, referenceDate) => {
     sort: DASHBOARD_SORTS.has(filters?.sort)
       ? filters.sort
       : DASHBOARD_SORT_DATE_DESC,
+  };
+};
+
+export const areDashboardFiltersEqual = (left, right) => {
+  return (
+    left?.period === right?.period &&
+    left?.month === right?.month &&
+    left?.year === right?.year &&
+    left?.category === right?.category &&
+    left?.search === right?.search &&
+    left?.sort === right?.sort
+  );
+};
+
+export const createExpenseDiscoveryQuery = (filters, limit = 20) => {
+  const params = new URLSearchParams({
+    period: filters.period,
+    sort: filters.sort,
+    limit: String(limit),
+  });
+
+  if (filters.period === DASHBOARD_PERIOD_MONTH) {
+    params.set("month", String(filters.month));
+    params.set("year", String(filters.year));
+  }
+  if (filters.category) params.set("category", filters.category);
+  if (filters.search.trim()) params.set("q", filters.search.trim());
+
+  return params.toString();
+};
+
+export const normalizeExpenseDiscoveryPayload = (payload) => {
+  if (!Array.isArray(payload?.data)) return null;
+
+  return {
+    data: payload.data,
+    returned: Number(payload.pageInfo?.returned) || payload.data.length,
+    total: Number(payload.totals?.count) || 0,
   };
 };
 
@@ -225,6 +311,102 @@ export const selectTodaySpending = (transactions, referenceDate) => {
       );
     })
   );
+};
+
+const isDateInRange = (date, start, end) =>
+  !Number.isNaN(date.getTime()) && date >= start && date <= end;
+
+export const selectLargestMonthlyExpenseCategory = (
+  transactions,
+  referenceDate
+) => {
+  if (!Array.isArray(transactions)) return null;
+
+  const date = parseLocalDashboardDate(referenceDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+  const endDate = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
+  const categoryTotals = new Map();
+
+  transactions.forEach((transaction) => {
+    const transactionDate = parseLocalDashboardDate(transaction?.date);
+    if (!isDateInRange(transactionDate, startDate, endDate)) return;
+
+    const category = String(transaction?.category || "").trim();
+    const amount = toFiniteAmount(transaction?.amount);
+    if (!category || amount <= 0) return;
+    categoryTotals.set(category, (categoryTotals.get(category) || 0) + amount);
+  });
+
+  const total = Array.from(categoryTotals.values()).reduce(
+    (sum, amount) => sum + amount,
+    0
+  );
+  if (total <= 0) return null;
+
+  const [category, amount] = Array.from(categoryTotals.entries()).sort(
+    ([leftCategory, leftAmount], [rightCategory, rightAmount]) =>
+      rightAmount - leftAmount || leftCategory.localeCompare(rightCategory, "id-ID")
+  )[0];
+
+  return { category, amount, share: amount / total, total };
+};
+
+export const selectSevenDayExpenseComparison = (transactions, referenceDate) => {
+  if (!Array.isArray(transactions)) return null;
+
+  const date = parseLocalDashboardDate(referenceDate);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+
+  const currentStart = new Date(date);
+  currentStart.setDate(currentStart.getDate() - 6);
+  const previousStart = new Date(date);
+  previousStart.setDate(previousStart.getDate() - 13);
+  const previousEnd = new Date(date);
+  previousEnd.setDate(previousEnd.getDate() - 7);
+  previousEnd.setHours(23, 59, 59, 999);
+  const currentEnd = new Date(date);
+  currentEnd.setHours(23, 59, 59, 999);
+
+  const totals = { current: 0, previous: 0 };
+  const hasExpenses = { current: false, previous: false };
+
+  transactions.forEach((transaction) => {
+    const transactionDate = parseLocalDashboardDate(transaction?.date);
+    const amount = toFiniteAmount(transaction?.amount);
+    if (amount <= 0) return;
+
+    if (isDateInRange(transactionDate, currentStart, currentEnd)) {
+      totals.current += amount;
+      hasExpenses.current = true;
+    } else if (isDateInRange(transactionDate, previousStart, previousEnd)) {
+      totals.previous += amount;
+      hasExpenses.previous = true;
+    }
+  });
+
+  if (!hasExpenses.current || !hasExpenses.previous) return null;
+
+  return {
+    currentTotal: totals.current,
+    previousTotal: totals.previous,
+    comparison:
+      totals.current === totals.previous
+        ? "equal"
+        : totals.current > totals.previous
+          ? "higher"
+          : "lower",
+  };
 };
 
 export const selectAdditionalIncomeTotal = (incomes) => {
