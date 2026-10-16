@@ -8,13 +8,17 @@ import Link from "next/link";
 import { PlusCircle, UserRound } from "lucide-react";
 
 import Button from "@/components/ui/Button";
+import Dialog from "@/components/ui/Dialog";
 import FormField from "@/components/ui/FormField";
 import StatusBanner from "@/components/ui/StatusBanner";
 import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/finance";
 import DashboardFilters from "@/app/(dashboard)/components/DashboardFilters";
+import ExpenseForm from "@/features/expenses/ExpenseForm";
 import FinancialOverview from "./FinancialOverview";
 import DashboardSkeleton from "./DashboardSkeleton";
 import TransactionSection from "@/features/transactions/TransactionSection";
+import CategoryBudgetSection from "./CategoryBudgetSection";
+import SpendingInsights from "./SpendingInsights";
 
 function ProfileCompletionPrompt({ onDismiss, onSave }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -125,8 +129,12 @@ export default function DashboardPage({
   availableExpensePeriods,
   currentAllowancePeriod,
   expenses,
-  filteredExpenses,
+  displayedExpenses,
+  discoveryResult,
+  discoveryPending,
   filters,
+  frequentExpenseCategories = [],
+  spendingInsights,
   isInitialLoading = false,
   metrics,
   onCompleteProfile,
@@ -137,18 +145,20 @@ export default function DashboardPage({
   onFilterChange,
   onRetryAllowance,
   onRetryExpenses,
+  onRetryDiscovery,
   onRetryIncomes,
   onSelectExpense,
+  onExpenseCreated,
   requestState,
   showProfilePrompt = false,
+  userId,
 }) {
+  const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const [isQuickCaptureSubmitting, setIsQuickCaptureSubmitting] = useState(false);
   const safeExpenses = useMemo(
     () => (Array.isArray(expenses) ? expenses : []),
     [expenses],
   );
-  const safeFilteredExpenses = Array.isArray(filteredExpenses)
-    ? filteredExpenses
-    : [];
   const categories = useMemo(() => {
     return Array.from(
       new Set([
@@ -196,6 +206,10 @@ export default function DashboardPage({
       <div className="order-2 hidden gap-2 md:col-start-2 md:row-start-1 md:flex md:items-start">
         <Link
           href="/add"
+          onClick={(event) => {
+            event.preventDefault();
+            setQuickCaptureOpen(true);
+          }}
           className="ui-button whitespace-nowrap"
           data-variant="primary"
           data-width="full"
@@ -224,9 +238,37 @@ export default function DashboardPage({
         />
       </div>
 
+      <div className="order-4 min-w-0 md:col-span-2">
+        <SpendingInsights insights={spendingInsights} />
+      </div>
+
+      <Dialog
+        open={quickCaptureOpen}
+        onClose={() => setQuickCaptureOpen(false)}
+        preventClose={isQuickCaptureSubmitting}
+        size="lg"
+        title="Tambah pengeluaran"
+        description="Catat pengeluaran tanpa meninggalkan ringkasan keuangan."
+      >
+        <ExpenseForm
+          onCancel={() => setQuickCaptureOpen(false)}
+          onSuccess={() => {
+            setIsQuickCaptureSubmitting(false);
+            setQuickCaptureOpen(false);
+            onExpenseCreated?.();
+          }}
+           onSubmittingChange={setIsQuickCaptureSubmitting}
+           frequentExpenseCategories={frequentExpenseCategories}
+         />
+      </Dialog>
+
       <div className="order-3 md:hidden">
         <Link
           href="/add"
+          onClick={(event) => {
+            event.preventDefault();
+            setQuickCaptureOpen(true);
+          }}
           className="ui-button whitespace-nowrap"
           data-variant="primary"
           data-width="full"
@@ -245,7 +287,7 @@ export default function DashboardPage({
         </div>
       ) : null}
 
-      <div className="order-5 min-w-0 md:col-span-2">
+      <div className="order-6 min-w-0 md:col-span-2">
         <DashboardFilters
           categories={categories}
           filters={filters}
@@ -256,17 +298,27 @@ export default function DashboardPage({
         />
       </div>
 
-      <div className="order-6 min-w-0 md:col-span-2">
+      <div className="order-7 min-w-0 md:col-span-2">
+        <CategoryBudgetSection
+          currentPeriod={currentAllowancePeriod}
+          expenseCategories={safeExpenses.map((expense) => expense.category).filter(Boolean)}
+          userId={userId}
+        />
+      </div>
+
+      <div className="order-8 min-w-0 md:col-span-2">
         <TransactionSection
-          transactions={safeFilteredExpenses}
-          hasAnyTransactions={safeExpenses.length > 0}
+          transactions={Array.isArray(displayedExpenses) ? displayedExpenses : []}
+          resultCount={discoveryResult}
+          isPending={discoveryPending}
+          hasAnyTransactions={discoveryResult.total > 0}
           filtersAreActive={filtersAreActive}
-          requestState={requestState.expenses}
+          requestState={requestState.discovery}
           onSelect={onSelectExpense}
           onEdit={onEditExpense}
           onDelete={onDeleteExpense}
           onResetFilters={resetFilters}
-          onRetry={onRetryExpenses}
+          onRetry={onRetryDiscovery}
         />
       </div>
     </div>

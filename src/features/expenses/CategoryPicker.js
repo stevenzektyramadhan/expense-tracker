@@ -7,6 +7,7 @@ export default function CategoryPicker({
   categoryRef,
   disabled,
   error,
+  frequentCategories = [],
   onChoiceChange,
   onCustomChange,
 }) {
@@ -34,6 +35,28 @@ export default function CategoryPicker({
           ))}
         </select>
       </FormField>
+
+      {frequentCategories.length > 0 ? (
+        <div className="mt-3" aria-label="Kategori yang sering digunakan">
+          <p className="mb-2 text-sm font-semibold text-[var(--color-text)]">
+            Sering digunakan
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {frequentCategories.map((categoryName) => (
+              <button
+                key={categoryName}
+                type="button"
+                aria-pressed={category.choice === categoryName}
+                disabled={disabled}
+                onClick={() => onChoiceChange(categoryName)}
+                className="min-h-11 rounded-[var(--radius-pill)] border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] active:bg-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:border-[var(--color-primary)] aria-pressed:bg-[var(--color-primary-soft)] aria-pressed:text-[var(--color-primary-strong)]"
+              >
+                {categoryName}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {category.choice === "Lainnya" ? (
         <div className="mt-2">
