@@ -1,10 +1,19 @@
 "use client";
 
+import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdatePrompt from "@/components/UpdatePrompt";
 
 export default function AppClientProviders() {
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        console.error("Service worker registration failed.");
+      });
+    }
+  }, []);
+
   return (
     <>
       <Toaster
