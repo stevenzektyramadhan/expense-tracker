@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { FilterX, Plus, ReceiptText, RefreshCw } from "lucide-react";
+import { Download, FilterX, Plus, ReceiptText, RefreshCw } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
 import Skeleton from "@/components/ui/Skeleton";
+import { createExpenseCsv } from "@/lib/csvExport.mjs";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import TransactionCard from "./TransactionCard";
 import TransactionTable from "./TransactionTable";
 
@@ -20,6 +22,8 @@ function TransactionLoadingState() {
 
 export default function TransactionSection({
   transactions,
+  resultCount = { returned: transactions.length, total: transactions.length },
+  isPending = false,
   hasAnyTransactions,
   filtersAreActive,
   requestState,
@@ -29,9 +33,26 @@ export default function TransactionSection({
   onResetFilters,
   onRetry,
 }) {
+  const exportTransactions = () => {
+    if (transactions.length === 0) return;
+
+    const csv = createExpenseCsv(transactions, formatDate, formatCurrency);
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "riwayat-transaksi.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   let content;
 
-  if (requestState.status === "idle" || requestState.status === "loading") {
+  if (
+    requestState.status === "idle" ||
+    (requestState.status === "loading" && transactions.length === 0)
+  ) {
     content = <TransactionLoadingState />;
   } else if (requestState.status === "error") {
     content = (
@@ -47,6 +68,20 @@ export default function TransactionSection({
         }
       />
     );
+  } else if (!hasAnyTransactions && filtersAreActive) {
+    content = (
+      <EmptyState
+        className="px-4"
+        icon={FilterX}
+        title="Tidak ada hasil"
+        description="Tidak ada transaksi yang cocok dengan filter atau pencarian ini."
+        action={
+          <Button size="compact" variant="secondary" onClick={onResetFilters}>
+            Reset filter
+          </Button>
+        }
+      />
+    );
   } else if (!hasAnyTransactions) {
     content = (
       <EmptyState
@@ -58,20 +93,6 @@ export default function TransactionSection({
           <Link href="/add" className="ui-button" data-variant="primary">
             Tambah pengeluaran
           </Link>
-        }
-      />
-    );
-  } else if (transactions.length === 0 && filtersAreActive) {
-    content = (
-      <EmptyState
-        className="px-4"
-        icon={FilterX}
-        title="Tidak ada hasil"
-        description="Tidak ada transaksi yang cocok dengan filter atau pencarian ini."
-        action={
-          <Button size="compact" variant="secondary" onClick={onResetFilters}>
-            Reset filter
-          </Button>
         }
       />
     );
@@ -123,7 +144,7 @@ export default function TransactionSection({
       className="scroll-mt-24 outline-none focus-visible:outline-[var(--focus-ring-width)] focus-visible:outline-offset-[var(--focus-ring-offset)] focus-visible:outline-[var(--color-focus)] lg:overflow-hidden lg:rounded-[var(--radius-surface)] lg:border lg:border-[var(--color-border)] lg:bg-[var(--color-surface)] lg:shadow-[var(--elevation-1)]"
       aria-labelledby="transaction-history-title"
     >
-      <div className="flex items-end justify-between gap-4 px-0 py-4 lg:border-b lg:border-[var(--color-border)] lg:px-5">
+      <div className="flex items-start justify-between gap-3 px-0 py-4 lg:border-b lg:border-[var(--color-border)] lg:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <span
             className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]"
@@ -143,11 +164,35 @@ export default function TransactionSection({
             </p>
           </div>
         </div>
-        {requestState.status === "success" ? (
-          <p className="shrink-0 rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2.5 py-1 text-sm font-semibold text-[var(--color-primary-strong)]">
-            {transactions.length} transaksi
-          </p>
-        ) : null}
+        <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+          {isPending ? (
+            <p className="rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2.5 py-1 text-sm font-semibold text-[var(--color-primary-strong)]">
+              Memperbarui hasil…
+            </p>
+          ) : requestState.status === "success" ? (
+            <p className="rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2.5 py-1 text-sm font-semibold text-[var(--color-primary-strong)]">
+              Menampilkan {resultCount.returned} dari {resultCount.total} transaksi (maks. 20)
+            </p>
+          ) : null}
+          <Button
+            size="compact"
+            variant="secondary"
+            onClick={exportTransactions}
+            disabled={isPending || transactions.length === 0}
+            aria-label={
+              isPending
+                ? "Ekspor transaksi yang ditampilkan tidak tersedia saat hasil sedang diperbarui"
+                : transactions.length === 0
+                ? "Ekspor transaksi yang ditampilkan, tidak tersedia karena belum ada transaksi"
+                : `Ekspor ${transactions.length} transaksi yang ditampilkan ke CSV`
+            }
+            title="Ekspor halaman transaksi yang ditampilkan (maks. 20)"
+          >
+            <Download className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Ekspor halaman (maks. 20)</span>
+            <span className="sm:hidden">Ekspor halaman</span>
+          </Button>
+        </div>
       </div>
       {content}
     </section>
