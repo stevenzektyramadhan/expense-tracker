@@ -105,5 +105,4 @@ model category_monthly_budgets {
 
   @@unique([user_id, year, month, category])
   @@index([user_id, year, month])
-  @@schema("public")
 }
