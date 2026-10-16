@@ -6,12 +6,16 @@
 
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+
+
+
 }
 
 datasource db {
   provider  = "postgresql"
-  schemas   = ["public", "auth"]
+
+
+
 }
 
 model expenses {
@@ -40,7 +44,8 @@ model expenses {
   // Relasi ke allowances
   allowances   allowances? @relation(fields: [allowance_id], references: [id])
 
-  @@schema("public")
+
+
 }
 
 model allowances {
@@ -64,7 +69,8 @@ model allowances {
   expenses           expenses[]
   additional_incomes additional_incomes[]
 
-  @@schema("public")
+
+
 }
 
 model additional_incomes {
@@ -83,5 +89,5 @@ model additional_incomes {
   @@index([user_id, date(sort: Desc)])
   @@index([allowance_id])
 
-  @@schema("public")
+
 }
