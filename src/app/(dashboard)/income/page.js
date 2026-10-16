@@ -236,10 +236,10 @@ export default function IncomeListPage() {
     <div className="mx-auto grid w-full max-w-5xl min-w-0 grid-cols-1 gap-5 px-4 sm:px-0 md:gap-6">
       <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="sr-only min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] [overflow-wrap:anywhere] md:not-sr-only">
+          <h1 className="min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] text-[var(--color-text)] [overflow-wrap:anywhere]">
             Pendapatan tambahan
           </h1>
-          <p className="hidden max-w-2xl text-sm text-[var(--color-text-muted)] md:mt-1 md:block">
+          <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">
             Tinjau uang yang menambah saldo dan periode yang menerimanya.
           </p>
         </div>

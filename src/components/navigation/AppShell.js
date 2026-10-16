@@ -126,7 +126,7 @@ export default function AppShell({ children, isLoading = false, user }) {
 
       <div
         id="app-status-region"
-        className="pointer-events-none fixed inset-x-4 bottom-[var(--app-status-bottom)] z-[var(--z-toast)] mx-auto max-w-lg md:inset-x-auto md:right-6 md:bottom-6 md:mx-0 md:w-[min(28rem,calc(100vw-3rem))]"
+        className="pointer-events-none fixed inset-x-4 bottom-[var(--app-status-bottom)] z-[var(--z-toast)] mx-auto flex max-w-lg flex-col gap-2 md:inset-x-auto md:right-6 md:bottom-6 md:mx-0 md:w-[min(28rem,calc(100vw-3rem))]"
       />
 
       <main

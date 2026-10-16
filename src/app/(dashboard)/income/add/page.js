@@ -60,10 +60,10 @@ export default function AddIncomePage() {
   return (
     <div className="mx-auto w-full max-w-3xl min-w-0 px-4 sm:px-0">
       <header className="mb-5 min-w-0">
-        <h1 className="sr-only min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] [overflow-wrap:anywhere] md:not-sr-only">
+        <h1 className="min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] text-[var(--color-text)] [overflow-wrap:anywhere]">
           Tambah pendapatan
         </h1>
-        <p className="text-sm text-[var(--color-text-muted)] md:mt-1">
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
           Catat uang yang menambah saldo dan pilih periode penerimanya.
         </p>
       </header>

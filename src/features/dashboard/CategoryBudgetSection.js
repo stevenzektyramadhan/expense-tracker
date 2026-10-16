@@ -107,45 +107,91 @@ function BudgetRow({ budget, disabled, onDelete, onEdit }) {
           ? "bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]"
           : "bg-[var(--color-income-soft)] text-[var(--color-income-strong)]";
 
+  const isOver = budget.remaining < 0;
+  const progressFill = isOver
+    ? "bg-[var(--color-expense)]"
+    : tone === "warning"
+      ? "bg-[var(--color-warning)]"
+      : "bg-[var(--color-primary)]";
+
+  const spentPercent =
+    budget.amount > 0
+      ? Math.min(Math.max(Math.round((budget.spent / budget.amount) * 100), 0), 100)
+      : 0;
+
   return (
-    <li className="min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:grid sm:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto] sm:items-center sm:gap-3">
-      <div className="flex min-w-0 items-start justify-between gap-3 sm:block">
-        <div className="min-w-0">
-          <p className="truncate font-semibold">{budget.category}</p>
-          <span className={`mt-1 inline-flex rounded-[var(--radius-pill)] px-2 py-0.5 text-xs font-semibold ${toneClass}`}>
+    <li className="min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 transition-colors hover:border-[var(--color-border-strong)]">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-bold text-[var(--color-text)]">
+            {budget.category}
+          </p>
+          <span
+            className={`inline-flex shrink-0 items-center rounded-[var(--radius-pill)] px-2 py-0.5 text-[0.6875rem] font-semibold ${toneClass}`}
+          >
             {statusLabel}
           </span>
         </div>
-        <div className="flex shrink-0 gap-1 sm:hidden">
-          <Button size="icon" variant="quiet" disabled={disabled} onClick={() => onEdit(budget)} aria-label={`Edit anggaran ${budget.category}`}>
-            <Pencil className="size-4" aria-hidden="true" />
+
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            size="icon"
+            variant="quiet"
+            disabled={disabled}
+            onClick={() => onEdit(budget)}
+            aria-label={`Edit anggaran ${budget.category}`}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
           </Button>
-          <Button size="icon" variant="quiet" disabled={disabled} onClick={() => onDelete(budget)} aria-label={`Hapus anggaran ${budget.category}`}>
-            <Trash2 className="size-4" aria-hidden="true" />
+          <Button
+            size="icon"
+            variant="quiet"
+            disabled={disabled}
+            onClick={() => onDelete(budget)}
+            aria-label={`Hapus anggaran ${budget.category}`}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
           </Button>
         </div>
       </div>
-      <BudgetValue label="Batas" value={budget.amount} />
-      <BudgetValue label="Terpakai" value={budget.spent} tone="expense" />
-      <BudgetValue label="Sisa" value={budget.remaining} tone={budget.remaining < 0 ? "expense" : "neutral"} />
-      <div className="hidden justify-end gap-1 sm:flex">
-        <Button size="icon" variant="quiet" disabled={disabled} onClick={() => onEdit(budget)} aria-label={`Edit anggaran ${budget.category}`}>
-          <Pencil className="size-4" aria-hidden="true" />
-        </Button>
-        <Button size="icon" variant="quiet" disabled={disabled} onClick={() => onDelete(budget)} aria-label={`Hapus anggaran ${budget.category}`}>
-          <Trash2 className="size-4" aria-hidden="true" />
-        </Button>
+
+      <div className="mt-2.5">
+        <div className="h-1.5 w-full overflow-hidden rounded-[var(--radius-pill)] bg-[var(--color-surface-subtle)]">
+          <div
+            className={`h-full rounded-[var(--radius-pill)] transition-all duration-300 ${progressFill}`}
+            style={{ width: `${spentPercent}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+        <div className="text-[var(--color-text-muted)]">
+          <span>Terpakai </span>
+          <CurrencyAmount
+            amount={budget.spent}
+            tone="expense"
+            showSign={false}
+            className="font-bold text-[var(--color-text)]"
+          />
+          <span> dari </span>
+          <CurrencyAmount
+            amount={budget.amount}
+            showSign={false}
+            className="font-semibold text-[var(--color-text-muted)]"
+          />
+        </div>
+
+        <div className="text-right">
+          <span className="text-[var(--color-text-muted)]">Sisa: </span>
+          <CurrencyAmount
+            amount={budget.remaining}
+            tone={isOver ? "expense" : "neutral"}
+            showSign={false}
+            className={`font-bold ${isOver ? "text-[var(--color-expense-strong)]" : "text-[var(--color-text)]"}`}
+          />
+        </div>
       </div>
     </li>
-  );
-}
-
-function BudgetValue({ label, tone = "neutral", value }) {
-  return (
-    <div className="mt-3 min-w-0 sm:mt-0">
-      <p className="text-xs text-[var(--color-text-muted)]">{label}</p>
-      <CurrencyAmount amount={value} tone={tone} showSign={false} className="mt-0.5 block break-words text-sm font-semibold" />
-    </div>
   );
 }
 
@@ -216,7 +262,7 @@ export default function CategoryBudgetSection({ currentPeriod, expenseCategories
         </div>
 
         {request.status === "success" ? (
-          <div className="mt-4 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3" aria-live="polite">
+          <div className="mt-4 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3" aria-live="polite">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold">Pengingat batas di perangkat ini</p>
@@ -278,10 +324,7 @@ export default function CategoryBudgetSection({ currentPeriod, expenseCategories
         ) : (
           <>
             {mutationError ? <p className="mt-3 text-sm font-semibold text-[var(--color-expense-strong)]" role="alert">{mutationError}</p> : null}
-            <div className="mt-4 hidden grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto] gap-3 px-3 text-xs font-semibold text-[var(--color-text-muted)] sm:grid">
-              <span>Kategori</span><span>Batas</span><span>Terpakai</span><span>Sisa</span><span className="sr-only">Aksi</span>
-            </div>
-            <ul className="mt-2 grid gap-2" aria-label={`Batas kategori ${periodLabel}`}>
+            <ul className="mt-3 grid gap-2.5" aria-label={`Batas kategori ${periodLabel}`}>
               {visibleBudgets.map((budget) => <BudgetRow key={budget.id} budget={budget} disabled={isMutating} onDelete={setDeleteTarget} onEdit={setFormBudget} />)}
             </ul>
           </>

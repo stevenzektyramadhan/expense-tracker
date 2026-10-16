@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Button from "@/components/ui/Button";
 import FormField from "@/components/ui/FormField";
@@ -13,9 +13,35 @@ export default function AllowancePage() {
   const { user } = useAuth();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const [amountError, setAmountError] = useState("");
   const [formError, setFormError] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadCurrentAllowance() {
+      if (!user) return;
+      try {
+        const response = await authenticatedFetch("/api/allowances");
+        const data = await response.json().catch(() => null);
+        if (!ignore && data?.amount) {
+          const numeric = Number(data.amount);
+          if (numeric > 0) {
+            setAmount(formatRupiah(numeric));
+          }
+        }
+      } catch {
+        // non-blocking
+      } finally {
+        if (!ignore) setFetching(false);
+      }
+    }
+    loadCurrentAllowance();
+    return () => {
+      ignore = true;
+    };
+  }, [user]);
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -100,8 +126,8 @@ export default function AllowancePage() {
               if (formError) setFormError("");
               if (saved) setSaved(false);
             }}
-            placeholder="Rp0"
-            disabled={loading}
+            placeholder={fetching ? "Memuat…" : "Rp0"}
+            disabled={loading || fetching}
           />
         </FormField>
 

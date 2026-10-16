@@ -1,9 +1,15 @@
+"use client";
+
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
+ * Hallmark · genre: modern-minimal · macrostructure: Overview Console · tone: calm, trustworthy ledger
+ */
 import Link from "next/link";
 import {
   ArrowRight,
   CalendarDays,
   CircleAlert,
   Clock3,
+  Coins,
   RefreshCw,
   WalletCards,
 } from "lucide-react";
@@ -25,50 +31,62 @@ const getCombinedStatus = (...statuses) => {
   return "success";
 };
 
-function Metric({ amount, icon: Icon, label, status, tone = "neutral", onRetry }) {
+function MetricCard({
+  amount,
+  icon: Icon,
+  label,
+  onRetry,
+  status,
+  tone = "neutral",
+}) {
   const isLoading = status === "idle" || status === "loading";
   const numericAmount = Number(amount);
   const isZero = Number.isFinite(numericAmount) && numericAmount === 0;
   const resolvedTone = isZero ? "neutral" : tone;
-  const surfaceClass =
-    status === "error"
-      ? "bg-[var(--color-expense-soft)]"
-      : resolvedTone === "expense"
-        ? "bg-[var(--color-expense-soft)]"
-        : "bg-[var(--color-surface-subtle)]";
 
   return (
-    <div className={`min-w-0 rounded-[var(--radius-control)] p-3 ${surfaceClass}`}>
-      <div className="flex min-w-0 items-center gap-2 text-[var(--color-text-muted)]">
-        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <p className="min-w-0 text-xs font-semibold leading-4">{label}</p>
+    <div className="flex min-w-0 flex-col justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 transition-colors">
+      <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-surface-subtle)] text-[var(--color-text-muted)]">
+          <Icon className="size-3.5" aria-hidden="true" />
+        </span>
+        <p className="truncate text-xs font-semibold">{label}</p>
       </div>
-      {isLoading ? (
-        <Skeleton className="mt-2" width="7rem" height="1.25rem" />
-      ) : status === "error" ? (
-        <div className="mt-1 flex flex-wrap items-center gap-1">
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-expense-strong)]">
-            <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-            Tidak tersedia
-          </span>
-          <Button size="compact" variant="quiet" onClick={onRetry}>
-            Coba lagi
-          </Button>
-        </div>
-      ) : (
-        <CurrencyAmount
-          amount={amount}
-          tone={resolvedTone}
-          showSign={!isZero && resolvedTone === "expense"}
-          className="mt-1 block break-words text-base font-bold sm:text-lg"
-          style={wrappingAmountStyle}
-        />
-      )}
+
+      <div className="mt-2 min-w-0">
+        {isLoading ? (
+          <Skeleton width="6.5rem" height="1.25rem" />
+        ) : status === "error" ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-expense-strong)]">
+              <CircleAlert className="size-3.5" aria-hidden="true" />
+              Gagal
+            </span>
+            <Button size="compact" variant="quiet" onClick={onRetry}>
+              Coba lagi
+            </Button>
+          </div>
+        ) : (
+          <CurrencyAmount
+            amount={amount}
+            tone={resolvedTone}
+            showSign={!isZero && resolvedTone === "expense"}
+            className="block truncate text-base font-bold sm:text-lg"
+            style={wrappingAmountStyle}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-function BreakdownValue({ amount, label, onRetry, status, tone = "neutral" }) {
+function BreakdownValue({
+  amount,
+  label,
+  onRetry,
+  status,
+  tone = "neutral",
+}) {
   const isLoading = status === "idle" || status === "loading";
   const numericAmount = Number(amount);
   const resolvedTone =
@@ -81,18 +99,18 @@ function BreakdownValue({ amount, label, onRetry, status, tone = "neutral" }) {
       </dt>
       <dd className="mt-1 min-w-0">
         {isLoading ? (
-          <Skeleton width="7rem" height="1.125rem" />
+          <Skeleton width="6rem" height="1rem" />
         ) : status === "error" ? (
           <Button size="compact" variant="quiet" onClick={onRetry}>
             Coba lagi
           </Button>
         ) : status === "missing" ? (
-          <span className="font-semibold text-[var(--color-text-muted)]">—</span>
+          <span className="text-sm font-semibold text-[var(--color-text-muted)]">—</span>
         ) : (
           <CurrencyAmount
             amount={amount}
             tone={resolvedTone}
-            className="block break-words text-sm font-bold"
+            className="block truncate text-sm font-bold text-[var(--color-text)]"
             style={wrappingAmountStyle}
           />
         )}
@@ -123,6 +141,11 @@ export default function FinancialOverview({
     Number.isFinite(allowanceAmount) &&
     allowanceAmount > 0 &&
     Number.isFinite(allowanceRemaining);
+
+  const spentAmount = hasUsageIndicator
+    ? Math.max(allowanceAmount - allowanceRemaining, 0)
+    : 0;
+
   const usagePercent = hasUsageIndicator
     ? Math.min(
         Math.max(
@@ -134,19 +157,37 @@ export default function FinancialOverview({
         100,
       )
     : 0;
+
   const remainingPercent = hasUsageIndicator
     ? Math.min(
         Math.max(Math.round((allowanceRemaining / allowanceAmount) * 100), 0),
         100,
       )
     : 0;
+
   const isOverBudget = hasUsageIndicator && allowanceRemaining < 0;
   const isLowRemaining = !isOverBudget && remainingPercent <= 20;
+
   const progressClass = isOverBudget
     ? "bg-[var(--color-expense)]"
     : isLowRemaining
       ? "bg-[var(--color-warning)]"
       : "bg-[var(--color-primary)]";
+
+  const statusBadge = isOverBudget ? (
+    <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--color-expense-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-expense-strong)]">
+      Melebihi anggaran
+    </span>
+  ) : isLowRemaining ? (
+    <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--color-warning-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-warning-strong)]">
+      Sisa menipis ({remainingPercent}%)
+    </span>
+  ) : hasUsageIndicator ? (
+    <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary-strong)]">
+      {remainingPercent}% tersisa
+    </span>
+  ) : null;
+
   const periodExpenseStatus = getCombinedStatus(
     requestState.expenses.status,
     requestState.allowance.status,
@@ -158,104 +199,126 @@ export default function FinancialOverview({
 
   return (
     <section
-      className="overflow-hidden rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--elevation-2)]"
+      className="overflow-hidden rounded-[var(--radius-prominent)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--elevation-1)]"
       aria-labelledby="financial-overview-title"
     >
-      <div className="p-4 sm:p-5 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] lg:gap-6 lg:p-6">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]">
-                <WalletCards className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p
-                  id="financial-overview-title"
-                  className="text-sm font-bold text-[var(--color-text)]"
-                >
-                  Sisa uang saku
-                </p>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {periodLabel}
-                </p>
+      <div className="p-4 sm:p-5 lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)] lg:gap-8 lg:p-6">
+        {/* Left Column: Hero Balance */}
+        <div className="flex min-w-0 flex-col justify-between">
+          <div>
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)]">
+                  <WalletCards className="size-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2
+                      id="financial-overview-title"
+                      className="text-sm font-bold text-[var(--color-text)]"
+                    >
+                      Sisa uang saku
+                    </h2>
+                    <span className="rounded-[var(--radius-pill)] bg-[var(--color-surface-subtle)] px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--color-text-muted)]">
+                      {periodLabel}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <Button size="compact" variant="quiet" onClick={onEditAllowance}>
-              Atur
-            </Button>
-          </div>
 
-          {allowanceStatus === "idle" ||
-          (allowanceStatus === "loading" && !hasAllowanceValue) ? (
-            <div className="mt-4" aria-label="Memuat sisa uang saku">
-              <Skeleton width="min(17rem, 82%)" height="2.5rem" />
-              <Skeleton className="mt-2" width="10rem" height="0.875rem" />
-            </div>
-          ) : allowanceStatus === "error" ? (
-            <div className="mt-4">
-              <p className="text-lg font-bold text-[var(--color-text)]">
-                Uang saku tidak tersedia
-              </p>
-              <p className="mt-1 max-w-md text-sm text-[var(--color-text-muted)]">
-                Data gagal dimuat dan tidak dianggap sebagai nilai nol.
-              </p>
-              <Button
-                className="mt-2"
-                size="compact"
-                variant="secondary"
-                onClick={onRetryAllowance}
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                Coba lagi
+              <Button size="compact" variant="quiet" onClick={onEditAllowance}>
+                Atur uang saku
               </Button>
             </div>
-          ) : allowanceStatus === "missing" ? (
-            <div className="mt-4">
-              <p className="text-lg font-bold text-[var(--color-text)]">
-                Uang saku belum diatur
-              </p>
-              <p className="mt-1 max-w-md text-sm text-[var(--color-text-muted)]">
-                Pilih Atur untuk menambahkan uang saku periode ini.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3 min-w-0">
-              <CurrencyAmount
-                amount={allowance?.remaining}
-                className="block max-w-full break-words font-[family-name:var(--font-display-family)] text-[clamp(2rem,9vw,3rem)] font-bold leading-none tracking-[-0.045em]"
-                style={wrappingAmountStyle}
-              />
-              <p className="mt-2 text-xs text-[var(--color-text-muted)] sm:text-sm">
-                dari total{" "}
-                <CurrencyAmount
-                  amount={allowance?.amount}
-                  className="font-semibold"
-                  style={wrappingAmountStyle}
-                />
-              </p>
-            </div>
-          )}
+
+            {allowanceStatus === "idle" ||
+            (allowanceStatus === "loading" && !hasAllowanceValue) ? (
+              <div className="mt-4" aria-label="Memuat sisa uang saku">
+                <Skeleton width="min(17rem, 82%)" height="2.75rem" />
+                <Skeleton className="mt-2" width="10rem" height="0.875rem" />
+              </div>
+            ) : allowanceStatus === "error" ? (
+              <div className="mt-4 rounded-[var(--radius-control)] bg-[var(--color-expense-soft)] p-3.5">
+                <p className="text-base font-bold text-[var(--color-expense-strong)]">
+                  Uang saku tidak tersedia
+                </p>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  Data gagal dimuat. Nilai tidak dianggap sebagai nol.
+                </p>
+                <Button
+                  className="mt-2"
+                  size="compact"
+                  variant="secondary"
+                  onClick={onRetryAllowance}
+                >
+                  <RefreshCw className="size-3.5" aria-hidden="true" />
+                  Coba lagi
+                </Button>
+              </div>
+            ) : allowanceStatus === "missing" ? (
+              <div className="mt-4 rounded-[var(--radius-control)] border border-dashed border-[var(--color-border)] p-4 text-center sm:text-left">
+                <p className="text-base font-bold text-[var(--color-text)]">
+                  Uang saku belum diatur
+                </p>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  Atur uang saku agar pengeluaran harian dan sisa saldo dapat dipantau.
+                </p>
+                <Button
+                  className="mt-3"
+                  size="compact"
+                  variant="primary"
+                  onClick={onEditAllowance}
+                >
+                  Atur sekarang
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <CurrencyAmount
+                    amount={allowance?.remaining}
+                    className="block font-[family-name:var(--font-display-family)] text-3xl font-extrabold tracking-tight text-[var(--color-text)] sm:text-4xl lg:text-[2.75rem]"
+                    style={wrappingAmountStyle}
+                  />
+                  {statusBadge}
+                </div>
+
+                <p className="mt-1.5 text-xs text-[var(--color-text-muted)] sm:text-sm">
+                  dari total alokasi{" "}
+                  <CurrencyAmount
+                    amount={allowance?.amount}
+                    className="font-bold text-[var(--color-text)]"
+                    style={wrappingAmountStyle}
+                  />
+                </p>
+              </div>
+            )}
+          </div>
 
           {hasUsageIndicator ? (
-            <div className="mt-3">
-              <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3 text-xs font-medium">
                 <span className="text-[var(--color-text-muted)]">
-                  Penggunaan {usagePercent}%
+                  Terpakai:{" "}
+                  <CurrencyAmount
+                    amount={spentAmount}
+                    showSign={false}
+                    className="font-bold text-[var(--color-text)]"
+                  />{" "}
+                  ({usagePercent}%)
                 </span>
-                <span
-                  className={
-                    isOverBudget
-                      ? "text-[var(--color-expense-strong)]"
-                      : isLowRemaining
-                        ? "text-[var(--color-warning-strong)]"
-                        : "text-[var(--color-primary-strong)]"
-                  }
-                >
-                  {isOverBudget ? "Melebihi batas" : `${remainingPercent}% tersisa`}
+                <span className="text-[var(--color-text-muted)]">
+                  Batas:{" "}
+                  <CurrencyAmount
+                    amount={allowanceAmount}
+                    showSign={false}
+                    className="font-bold text-[var(--color-text)]"
+                  />
                 </span>
               </div>
+
               <div
-                className="mt-2 h-2 overflow-hidden rounded-[var(--radius-pill)] bg-[var(--color-surface-subtle)]"
+                className="mt-2 h-2.5 w-full overflow-hidden rounded-[var(--radius-pill)] bg-[var(--color-surface-subtle)]"
                 role="progressbar"
                 aria-label="Penggunaan uang saku"
                 aria-valuemin={0}
@@ -268,7 +331,7 @@ export default function FinancialOverview({
                 }
               >
                 <span
-                  className={`block h-full rounded-[var(--radius-pill)] ${progressClass}`}
+                  className={`block h-full rounded-[var(--radius-pill)] transition-all duration-300 ${progressClass}`}
                   style={{ width: `${usagePercent}%` }}
                   aria-hidden="true"
                 />
@@ -281,50 +344,59 @@ export default function FinancialOverview({
               className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-muted)]"
               role="status"
             >
-              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-              Memperbarui uang saku…
+              <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
+              Memperbarui saldo uang saku…
             </p>
           ) : null}
         </div>
 
-        <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 lg:mt-0 lg:self-end">
-          <Metric
-            amount={metrics.todaySpending}
-            icon={Clock3}
-            label="Hari ini"
-            status={requestState.expenses.status}
-            tone="expense"
-            onRetry={onRetryExpenses}
-          />
-          <Metric
-            amount={metrics.currentAllowancePeriodSpending}
-            icon={CalendarDays}
-            label={periodLabel}
-            status={periodExpenseStatus}
-            tone="expense"
-            onRetry={
-              requestState.expenses.status === "error"
-                ? onRetryExpenses
-                : onRetryAllowance
-            }
-          />
+        {/* Right Column: Today & Period Metrics */}
+        <div className="mt-4 flex min-w-0 flex-col justify-center gap-3 lg:mt-0">
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)] lg:sr-only">
+            Aktivitas pengeluaran
+          </p>
+          <div className="grid min-w-0 grid-cols-2 gap-2.5">
+            <MetricCard
+              amount={metrics.todaySpending}
+              icon={Clock3}
+              label="Hari ini"
+              status={requestState.expenses.status}
+              tone="expense"
+              onRetry={onRetryExpenses}
+            />
+            <MetricCard
+              amount={metrics.currentAllowancePeriodSpending}
+              icon={CalendarDays}
+              label={periodLabel}
+              status={periodExpenseStatus}
+              tone="expense"
+              onRetry={
+                requestState.expenses.status === "error"
+                  ? onRetryExpenses
+                  : onRetryAllowance
+              }
+            />
+          </div>
         </div>
       </div>
 
-      <div className="border-t border-[var(--color-border)] bg-[var(--color-income-soft)] px-4 py-2 sm:px-5 lg:px-6">
+      {/* Bottom Panel: Breakdown */}
+      <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-subtle)]/60 px-4 py-3 sm:px-5 lg:px-6">
         <div className="flex min-w-0 items-center justify-between gap-3">
-          <p className="text-xs font-bold text-[var(--color-income-strong)]">
-            Rincian uang saku
-          </p>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-text)]">
+            <Coins className="size-3.5 text-[var(--color-primary-strong)]" aria-hidden="true" />
+            <span>Rincian alokasi {periodLabel.toLowerCase()}</span>
+          </div>
           <Link
             href="/income"
-            className="inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-control)] px-2 text-xs font-semibold text-[var(--color-income-strong)] outline-none hover:underline focus-visible:outline-[var(--focus-ring-width)] focus-visible:outline-offset-[var(--focus-ring-offset)] focus-visible:outline-[var(--color-focus)] active:text-[var(--color-text)]"
+            className="inline-flex min-h-8 items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-[var(--color-primary-strong)] outline-none hover:underline focus-visible:outline-[var(--focus-ring-width)] focus-visible:outline-offset-[var(--focus-ring-offset)] focus-visible:outline-[var(--color-focus)]"
           >
-            Riwayat pendapatan
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            Kelola pendapatan
+            <ArrowRight className="size-3" aria-hidden="true" />
           </Link>
         </div>
-        <dl className="grid min-w-0 grid-cols-2 gap-4 pb-1">
+
+        <dl className="mt-2.5 grid min-w-0 grid-cols-2 gap-4 sm:grid-cols-3">
           <BreakdownValue
             amount={metrics.baseAllowanceDisplay}
             label="Uang saku awal"
@@ -340,6 +412,15 @@ export default function FinancialOverview({
             tone="income"
             onRetry={onRetryIncomes}
           />
+          <div className="col-span-2 sm:col-span-1">
+            <BreakdownValue
+              amount={allowance?.amount}
+              label="Total alokasi aktif"
+              status={allowanceStatus}
+              tone="neutral"
+              onRetry={onRetryAllowance}
+            />
+          </div>
         </dl>
       </div>
     </section>

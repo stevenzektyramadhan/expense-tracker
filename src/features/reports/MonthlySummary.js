@@ -73,10 +73,10 @@ export default function MonthlySummary({
   return (
     <div className="mx-auto grid w-full max-w-6xl min-w-0 gap-6 px-4 sm:px-0">
       <header className="min-w-0">
-        <h1 className="sr-only min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] [overflow-wrap:anywhere] md:not-sr-only">
+        <h1 className="min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] text-[var(--color-text)] [overflow-wrap:anywhere]">
           Ringkasan bulanan
         </h1>
-        <p className="text-sm text-[var(--color-text-muted)] md:mt-1">
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
           Lihat pengeluaran berdasarkan periode dan kategori.
         </p>
       </header>

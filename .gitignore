@@ -41,6 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+.omo/
+.playwright-mcp/
+qa/*.png
+
+
 
 # local/private agent review artifacts
 AI_AGENT_TASKS.md

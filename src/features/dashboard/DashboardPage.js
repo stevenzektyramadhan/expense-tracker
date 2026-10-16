@@ -1,6 +1,6 @@
 "use client";
 
-/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
  * Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: Calm Ledger · designed-as-app
  */
 import { useMemo, useState } from "react";
@@ -18,6 +18,7 @@ import FinancialOverview from "./FinancialOverview";
 import DashboardSkeleton from "./DashboardSkeleton";
 import TransactionSection from "@/features/transactions/TransactionSection";
 import CategoryBudgetSection from "./CategoryBudgetSection";
+import RecentTransactions from "./RecentTransactions";
 import SpendingInsights from "./SpendingInsights";
 
 function ProfileCompletionPrompt({ onDismiss, onSave }) {
@@ -167,6 +168,7 @@ export default function DashboardPage({
       ]),
     );
   }, [safeExpenses]);
+
   const filtersAreActive =
     filters.period === "all" ||
     filters.month !== currentAllowancePeriod.month ||
@@ -191,42 +193,39 @@ export default function DashboardPage({
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4 px-4 sm:px-0 md:grid-cols-[minmax(0,1fr)_auto] md:gap-x-8 md:gap-y-6">
-      <h1 className="sr-only md:hidden">Ringkasan keuangan</h1>
+    <div className="flex min-w-0 flex-col gap-5 px-4 sm:px-0">
+      {/* 1. Header with dynamic context & desktop quick actions */}
+      <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-tight text-[var(--color-text)]">
+            Ringkasan keuangan
+          </h1>
+          <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
+            Pantau sisa uang saku dan transaksi harian dalam satu tampilan.
+          </p>
+        </div>
 
-      <header className="order-1 hidden min-w-0 md:col-start-1 md:row-start-1 md:block">
-        <h1 className="min-w-0 [overflow-wrap:anywhere] font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em]">
-          Ringkasan keuangan
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">
-          Sisa uang saku dan transaksi dalam satu tampilan.
-        </p>
+        <div className="hidden items-center gap-2.5 sm:flex">
+          <Link
+            href="/income/add"
+            className="ui-button whitespace-nowrap"
+            data-variant="secondary"
+          >
+            Tambah pendapatan
+          </Link>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => setQuickCaptureOpen(true)}
+          >
+            <PlusCircle className="size-4" aria-hidden="true" />
+            Tambah pengeluaran
+          </Button>
+        </div>
       </header>
 
-      <div className="order-2 hidden gap-2 md:col-start-2 md:row-start-1 md:flex md:items-start">
-        <Link
-          href="/add"
-          onClick={(event) => {
-            event.preventDefault();
-            setQuickCaptureOpen(true);
-          }}
-          className="ui-button whitespace-nowrap"
-          data-variant="primary"
-          data-width="full"
-        >
-          Tambah pengeluaran
-        </Link>
-        <Link
-          href="/income/add"
-          className="ui-button whitespace-nowrap"
-          data-variant="secondary"
-          data-width="full"
-        >
-          Tambah pendapatan
-        </Link>
-      </div>
-
-      <div className="order-2 min-w-0 md:order-3 md:col-span-2 md:row-start-2">
+      {/* 2. Dominant Financial Hero Overview */}
+      <div className="min-w-0">
         <FinancialOverview
           allowance={allowance}
           metrics={metrics}
@@ -238,10 +237,7 @@ export default function DashboardPage({
         />
       </div>
 
-      <div className="order-4 min-w-0 md:col-span-2">
-        <SpendingInsights insights={spendingInsights} />
-      </div>
-
+      {/* Quick capture modal */}
       <Dialog
         open={quickCaptureOpen}
         onClose={() => setQuickCaptureOpen(false)}
@@ -257,29 +253,47 @@ export default function DashboardPage({
             setQuickCaptureOpen(false);
             onExpenseCreated?.();
           }}
-           onSubmittingChange={setIsQuickCaptureSubmitting}
-           frequentExpenseCategories={frequentExpenseCategories}
-         />
+          onSubmittingChange={setIsQuickCaptureSubmitting}
+          frequentExpenseCategories={frequentExpenseCategories}
+          showHeader={false}
+        />
       </Dialog>
 
-      <div className="order-3 md:hidden">
-        <Link
-          href="/add"
-          onClick={(event) => {
-            event.preventDefault();
-            setQuickCaptureOpen(true);
-          }}
-          className="ui-button whitespace-nowrap"
-          data-variant="primary"
-          data-width="full"
+      {/* 3. Mobile Action Buttons */}
+      <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => setQuickCaptureOpen(true)}
+          className="w-full justify-center"
         >
-          <PlusCircle className="h-5 w-5" aria-hidden="true" />
+          <PlusCircle className="size-4" aria-hidden="true" />
           Tambah pengeluaran
+        </Button>
+        <Link
+          href="/income/add"
+          className="ui-button w-full justify-center whitespace-nowrap"
+          data-variant="secondary"
+        >
+          Tambah pendapatan
         </Link>
       </div>
 
+      {/* 4. Mobile Recent Transactions preview (top 3 for fast glance) */}
+      <div className="min-w-0 lg:hidden">
+        <RecentTransactions
+          transactions={safeExpenses}
+          requestStatus={requestState.expenses}
+          filtersAreActive={filtersAreActive}
+          onSelect={onSelectExpense}
+          onEdit={onEditExpense}
+          onDelete={onDeleteExpense}
+        />
+      </div>
+
+      {/* 5. Non-blocking Profile Prompt */}
       {showProfilePrompt ? (
-        <div className="order-4 min-w-0 md:col-span-2">
+        <div className="min-w-0">
           <ProfileCompletionPrompt
             onDismiss={onDismissProfilePrompt}
             onSave={onCompleteProfile}
@@ -287,39 +301,44 @@ export default function DashboardPage({
         </div>
       ) : null}
 
-      <div className="order-6 min-w-0 md:col-span-2">
-        <DashboardFilters
-          categories={categories}
-          filters={filters}
-          availableExpensePeriods={availableExpensePeriods}
-          hasActiveFilters={filtersAreActive}
-          onFilterChange={onFilterChange}
-          onReset={resetFilters}
-        />
-      </div>
+      {/* 6. Responsive Workbench Layout: Desktop 2-column (Ledger + Workbench Analytics) */}
+      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
+        {/* Left Column: Ledger (Filters + Transaction Section) */}
+        <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1 lg:col-span-7 xl:col-span-8">
+          <DashboardFilters
+            categories={categories}
+            filters={filters}
+            availableExpensePeriods={availableExpensePeriods}
+            hasActiveFilters={filtersAreActive}
+            onFilterChange={onFilterChange}
+            onReset={resetFilters}
+          />
 
-      <div className="order-7 min-w-0 md:col-span-2">
-        <CategoryBudgetSection
-          currentPeriod={currentAllowancePeriod}
-          expenseCategories={safeExpenses.map((expense) => expense.category).filter(Boolean)}
-          userId={userId}
-        />
-      </div>
+          <TransactionSection
+            transactions={Array.isArray(displayedExpenses) ? displayedExpenses : []}
+            resultCount={discoveryResult}
+            isPending={discoveryPending}
+            hasAnyTransactions={discoveryResult.total > 0}
+            filtersAreActive={filtersAreActive}
+            requestState={requestState.discovery}
+            onSelect={onSelectExpense}
+            onEdit={onEditExpense}
+            onDelete={onDeleteExpense}
+            onResetFilters={resetFilters}
+            onRetry={onRetryDiscovery}
+          />
+        </div>
 
-      <div className="order-8 min-w-0 md:col-span-2">
-        <TransactionSection
-          transactions={Array.isArray(displayedExpenses) ? displayedExpenses : []}
-          resultCount={discoveryResult}
-          isPending={discoveryPending}
-          hasAnyTransactions={discoveryResult.total > 0}
-          filtersAreActive={filtersAreActive}
-          requestState={requestState.discovery}
-          onSelect={onSelectExpense}
-          onEdit={onEditExpense}
-          onDelete={onDeleteExpense}
-          onResetFilters={resetFilters}
-          onRetry={onRetryDiscovery}
-        />
+        {/* Right Column: Workbench Analytics (Category Budgets + Spending Insights) */}
+        <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2 lg:col-span-5 xl:col-span-4">
+          <CategoryBudgetSection
+            currentPeriod={currentAllowancePeriod}
+            expenseCategories={safeExpenses.map((expense) => expense.category).filter(Boolean)}
+            userId={userId}
+          />
+
+          <SpendingInsights insights={spendingInsights} />
+        </div>
       </div>
     </div>
   );

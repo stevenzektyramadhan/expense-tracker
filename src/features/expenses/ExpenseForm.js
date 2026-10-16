@@ -21,6 +21,7 @@ export default function ExpenseForm({
   onSuccess,
   onSubmittingChange,
   frequentExpenseCategories = [],
+  showHeader = true,
 }) {
   const {
     amountRef,
@@ -49,15 +50,17 @@ export default function ExpenseForm({
   const phaseMessage = PHASE_MESSAGES[submitPhase] || "";
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 sm:px-0">
-      <header className="mb-5 min-w-0">
-        <h1 className="min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] text-[var(--color-text)] [overflow-wrap:anywhere]">
-          Tambah pengeluaran
-        </h1>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Catat jumlah dan kategori terlebih dahulu. Detail lain dapat ditambahkan jika diperlukan.
-        </p>
-      </header>
+    <div className={`mx-auto w-full max-w-3xl ${showHeader ? "px-4 sm:px-0" : ""}`}>
+      {showHeader ? (
+        <header className="mb-5 min-w-0">
+          <h1 className="min-w-0 font-[family-name:var(--font-display-family)] text-2xl font-bold tracking-[-0.025em] text-[var(--color-text)] [overflow-wrap:anywhere]">
+            Tambah pengeluaran
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+            Catat jumlah dan kategori terlebih dahulu. Detail lain dapat ditambahkan jika diperlukan.
+          </p>
+        </header>
+      ) : null}
 
       <form
         onSubmit={handleSubmit}
