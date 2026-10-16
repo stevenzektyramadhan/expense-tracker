@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 const parseMonth = (value) => {
@@ -81,8 +82,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(req);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
     if (errorResponse) return errorResponse;
+    const originError = requireAllowedMutationOrigin(req, authMethod);
+    if (originError) return originError;
 
     const { amount, source, note, date } = await req.json();
 

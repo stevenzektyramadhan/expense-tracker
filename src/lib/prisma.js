@@ -30,6 +30,10 @@ const { Pool } = pg;
 // DATABASE_URL is the fallback if DIRECT_URL is not set
 const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 
+export const transactionOptions = {
+  maxWait: 10_000,
+};
+
 // =============================================================================
 // Factory function to create PrismaClient with the PostgreSQL adapter
 // =============================================================================
@@ -48,6 +52,7 @@ const prismaClientSingleton = () => {
   // In Prisma 7.x, we MUST provide an adapter for the "client" engine type
   return new PrismaClient({
     adapter: adapter,
+    transactionOptions,
     // Uncomment the 'log' option below to see all SQL queries in your terminal
     // Useful for debugging, but can be noisy in production
     // log: ['query', 'info', 'warn', 'error'],

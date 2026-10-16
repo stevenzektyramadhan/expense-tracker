@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { v2 as cloudinary } from "cloudinary";
+import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
+import { destroyReceipt } from "@/lib/receiptAsset";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 import prisma from "@/lib/prisma";
 
@@ -46,10 +48,12 @@ const detectImageType = (buffer) => {
 
 export async function POST(request) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(request);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(request);
     if (errorResponse) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const originError = requireAllowedMutationOrigin(request, authMethod);
+    if (originError) return originError;
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -90,7 +94,7 @@ export async function POST(request) {
           {
             resource_type: "image",
             folder: "expense-receipts", // Organize uploads in a folder
-            public_id: randomUUID(),
+            public_id: `expense-receipts/${randomUUID()}`,
             context: {
               owner_id: user.id,
             },
@@ -121,10 +125,12 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
-    const { user, errorResponse } = await requireAuthenticatedUser(request);
+    const { user, authMethod, errorResponse } = await requireAuthenticatedUser(request);
     if (errorResponse) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const originError = requireAllowedMutationOrigin(request, authMethod);
+    if (originError) return originError;
 
     const { expense_id } = await request.json();
 
@@ -143,12 +149,31 @@ export async function DELETE(request) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 });
     }
 
-    return NextResponse.json(
-      {
-        error: "Receipt deletion requires stored Cloudinary public_id ownership mapping before it can be enabled safely.",
-      },
-      { status: 501 }
-    );
+    if (!expense.receipt_public_id) {
+      return NextResponse.json(
+        {
+          error: "Receipt deletion is unavailable for legacy receipts without a stored ownership mapping.",
+        },
+        { status: 409 }
+      );
+    }
+
+    await prisma.expenses.update({
+      where: { id: expense.id },
+      data: { receipt_url: null },
+    });
+
+    const destroyResult = await destroyReceipt(expense.receipt_public_id);
+    if (destroyResult.result !== "ok" && destroyResult.result !== "not found") {
+      return NextResponse.json({ error: "Receipt deletion could not be completed. Please retry." }, { status: 502 });
+    }
+
+    await prisma.expenses.update({
+      where: { id: expense.id },
+      data: { receipt_public_id: null },
+    });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete error:", error);
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });
