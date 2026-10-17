@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Download, FilterX, Plus, ReceiptText, RefreshCw } from "lucide-react";
+import { FilterX, Plus, ReceiptText, RefreshCw } from "lucide-react";
 
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
 import Skeleton from "@/components/ui/Skeleton";
-import { createExpenseCsv } from "@/lib/csvExport.mjs";
-import { formatCurrency, formatDate } from "@/lib/utils";
 import TransactionCard from "./TransactionCard";
 import TransactionTable from "./TransactionTable";
 
@@ -33,20 +31,6 @@ export default function TransactionSection({
   onResetFilters,
   onRetry,
 }) {
-  const exportTransactions = () => {
-    if (transactions.length === 0) return;
-
-    const csv = createExpenseCsv(transactions, formatDate, formatCurrency);
-    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "riwayat-transaksi.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   let content;
 
   if (
@@ -174,24 +158,6 @@ export default function TransactionSection({
               Menampilkan {resultCount.returned} dari {resultCount.total} transaksi (maks. 20)
             </p>
           ) : null}
-          <Button
-            size="compact"
-            variant="secondary"
-            onClick={exportTransactions}
-            disabled={isPending || transactions.length === 0}
-            aria-label={
-              isPending
-                ? "Ekspor transaksi yang ditampilkan tidak tersedia saat hasil sedang diperbarui"
-                : transactions.length === 0
-                ? "Ekspor transaksi yang ditampilkan, tidak tersedia karena belum ada transaksi"
-                : `Ekspor ${transactions.length} transaksi yang ditampilkan ke CSV`
-            }
-            title="Ekspor halaman transaksi yang ditampilkan (maks. 20)"
-          >
-            <Download className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Ekspor halaman (maks. 20)</span>
-            <span className="sm:hidden">Ekspor halaman</span>
-          </Button>
         </div>
       </div>
       {content}
