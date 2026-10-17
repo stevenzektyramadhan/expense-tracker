@@ -1,7 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createExpenseCsv, escapeCsvCell } from "../src/lib/csvExport.mjs";
+import {
+  createExpenseCsv,
+  escapeCsvCell,
+  getExpenseCsvFilename,
+  getMonthDateRange,
+} from "../src/lib/csvExport.mjs";
+
+test("Given a normal month, When getting its date range, Then it includes that month's final day", () => {
+  assert.deepEqual(getMonthDateRange("2026-10"), {
+    startDate: "2026-10-01",
+    endDate: "2026-10-31",
+  });
+});
+
+test("Given a leap-year February, When getting its date range, Then it includes February 29", () => {
+  assert.deepEqual(getMonthDateRange("2024-02"), {
+    startDate: "2024-02-01",
+    endDate: "2024-02-29",
+  });
+});
+
+test("Given December, When getting its date range, Then it keeps the year boundary in the selected month", () => {
+  assert.deepEqual(getMonthDateRange("2026-12"), {
+    startDate: "2026-12-01",
+    endDate: "2026-12-31",
+  });
+});
+
+test("Given a selected month, When getting the CSV filename, Then it uses the month in the filename", () => {
+  assert.equal(getExpenseCsvFilename("2026-12"), "transaksi-2026-12.csv");
+});
 
 test("Given a cell with commas, quotes, or newlines, When escaping CSV, Then it uses RFC 4180 quoting", () => {
   assert.equal(escapeCsvCell('Makan, "siang"\nkantor'), '"Makan, ""siang""\nkantor"');

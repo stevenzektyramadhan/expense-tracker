@@ -1,5 +1,17 @@
 const FORMULA_PREFIX = /^[=+\-@]/;
 
+export const getMonthDateRange = (month) => {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+
+  return {
+    startDate: `${month}-01`,
+    endDate: `${month}-${String(lastDay).padStart(2, "0")}`,
+  };
+};
+
+export const getExpenseCsvFilename = (month) => `transaksi-${month}.csv`;
+
 export const escapeCsvCell = (value) => {
   const normalizedValue = String(value ?? "");
   const spreadsheetSafeValue = FORMULA_PREFIX.test(normalizedValue)
