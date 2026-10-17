@@ -4,9 +4,16 @@
  * Hallmark · genre: modern-minimal · macrostructure: Index-First · design-system: Calm Ledger · designed-as-app
  */
 import dynamic from "next/dynamic";
-import { BarChart3, CalendarDays, CalendarRange, PieChart } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  CalendarRange,
+  Download,
+  PieChart,
+} from "lucide-react";
 
 import CurrencyAmount from "@/components/finance/CurrencyAmount";
+import Button from "@/components/ui/Button";
 import FormField from "@/components/ui/FormField";
 import Skeleton from "@/components/ui/Skeleton";
 import RankedCategoryList from "@/features/reports/RankedCategoryList";
@@ -63,6 +70,9 @@ export default function MonthlySummary({
   onMonthChange,
   selectedMonth,
   selectedMonthData,
+  onExport,
+  isExporting,
+  exportError,
 }) {
   const selectedLabel = selectedMonthData?.label || "Periode terpilih";
   const selectedTotal = Number(selectedMonthData?.total || 0);
@@ -101,23 +111,48 @@ export default function MonthlySummary({
             </h2>
           </div>
         </div>
-        <FormField
-            id="summary-month-filter"
-            label="Bulan"
-            helperText="Pilih bulan yang ingin ditinjau."
-            className="mt-3"
-          >
-            <select
-              value={selectedMonth}
-              onChange={(event) => onMonthChange(event.target.value)}
+        <div className="min-w-0">
+          <FormField
+              id="summary-month-filter"
+              label="Bulan"
+              helperText="Pilih bulan yang ingin ditinjau."
+              className="mt-3"
             >
-              {monthlyData.map((month) => (
-                <option key={month.key} value={month.key}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </FormField>
+              <select
+                value={selectedMonth}
+                onChange={(event) => onMonthChange(event.target.value)}
+              >
+                {monthlyData.map((month) => (
+                  <option key={month.key} value={month.key}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+          <div className="mt-4 flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-end">
+            <Button
+              size="compact"
+              variant="secondary"
+              onClick={onExport}
+              isLoading={isExporting}
+              loadingLabel="Menyiapkan CSV…"
+              aria-label={
+                isExporting
+                  ? `Menyiapkan ekspor pengeluaran ${selectedLabel}`
+                  : `Unduh CSV pengeluaran ${selectedLabel}`
+              }
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Unduh CSV bulan terpilih
+            </Button>
+            {exportError ? (
+              <p className="text-sm leading-6 text-[var(--color-danger-strong)]" role="alert">
+                {exportError}
+              </p>
+            ) : null}
+          </div>
+        </div>
 
         <div className="min-w-0 border-t border-[var(--color-border)] pt-4 md:border-l md:border-t-0 md:pb-5 md:pl-5 md:pt-0">
           <p className="text-sm text-[var(--color-text-muted)]">

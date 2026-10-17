@@ -11,11 +11,19 @@ import MonthlySummary, {
   MonthlySummarySkeleton,
 } from "@/features/reports/MonthlySummary";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
+import {
+  createExpenseCsv,
+  getExpenseCsvFilename,
+  getMonthDateRange,
+} from "@/lib/csvExport.mjs";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 const SUMMARY_LOAD_ERROR =
   "Ringkasan belum dapat dimuat. Periksa koneksi lalu coba lagi.";
 const SUMMARY_AUTH_ERROR =
   "Sesi Anda berakhir. Masuk kembali lalu coba lagi.";
+const EXPORT_ERROR =
+  "Pengeluaran bulan ini belum dapat diekspor. Periksa koneksi lalu coba lagi.";
 
 const getExistingCurrentMonthKey = () =>
   new Date().toISOString().slice(0, 7);
@@ -31,6 +39,19 @@ function getSafeSummaryError({ message = "", status }) {
   }
 
   return SUMMARY_LOAD_ERROR;
+}
+
+function getSafeExportError({ message = "", status }) {
+  if (
+    status === 401 ||
+    /sesi login|sesi anda berakhir|login ulang|unauthorized|jwt|token/i.test(
+      message,
+    )
+  ) {
+    return SUMMARY_AUTH_ERROR;
+  }
+
+  return EXPORT_ERROR;
 }
 
 function normalizeSummaryPayload(payload) {
@@ -70,6 +91,11 @@ export default function SummaryPage() {
     message: "",
   });
   const activeRequestRef = useRef(null);
+  const exportRequestRef = useRef(null);
+  const [exportState, setExportState] = useState({
+    status: "idle",
+    message: "",
+  });
 
   const fetchSummaryData = useCallback(async () => {
     activeRequestRef.current?.abort();
@@ -116,11 +142,71 @@ export default function SummaryPage() {
     }
   }, []);
 
+  const exportSelectedMonth = useCallback(async () => {
+    if (!selectedMonth) return;
+
+    exportRequestRef.current?.abort();
+    const controller = new AbortController();
+    exportRequestRef.current = controller;
+    setExportState({ status: "loading", message: "" });
+
+    try {
+      const { startDate, endDate } = getMonthDateRange(selectedMonth);
+      const query = new URLSearchParams({ startDate, endDate });
+      const response = await authenticatedFetch(`/api/expenses?${query}`, {
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          getSafeExportError({
+            message: payload?.error,
+            status: response.status,
+          }),
+        );
+      }
+
+      if (!Array.isArray(payload)) {
+        throw new Error(EXPORT_ERROR);
+      }
+
+      const csv = createExpenseCsv(payload, formatDate, formatCurrency);
+      const blob = new Blob(["\uFEFF", csv], {
+        type: "text/csv;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = getExpenseCsvFilename(selectedMonth);
+      link.click();
+      URL.revokeObjectURL(url);
+
+      if (!controller.signal.aborted) {
+        setExportState({ status: "success", message: "" });
+      }
+    } catch (error) {
+      if (controller.signal.aborted || error?.name === "AbortError") return;
+
+      setExportState({
+        status: "error",
+        message: getSafeExportError({
+          message: error instanceof Error ? error.message : "",
+        }),
+      });
+    } finally {
+      if (exportRequestRef.current === controller) {
+        exportRequestRef.current = null;
+      }
+    }
+  }, [selectedMonth]);
+
   useEffect(() => {
     fetchSummaryData();
 
     return () => {
       activeRequestRef.current?.abort();
+      exportRequestRef.current?.abort();
     };
   }, [fetchSummaryData]);
 
@@ -197,6 +283,9 @@ export default function SummaryPage() {
       selectedMonth={selectedMonth}
       selectedMonthData={selectedMonthData}
       onMonthChange={setSelectedMonth}
+      onExport={exportSelectedMonth}
+      isExporting={exportState.status === "loading"}
+      exportError={exportState.status === "error" ? exportState.message : ""}
     />
   );
 }
