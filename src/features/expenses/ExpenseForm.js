@@ -22,6 +22,8 @@ export default function ExpenseForm({
   onSubmittingChange,
   frequentExpenseCategories = [],
   showHeader = true,
+  actionPlacement = "inline",
+  formId,
 }) {
   const {
     amountRef,
@@ -63,6 +65,7 @@ export default function ExpenseForm({
       ) : null}
 
       <form
+        id={formId}
         onSubmit={handleSubmit}
         noValidate
         className="group/expense-form space-y-4"
@@ -90,6 +93,24 @@ export default function ExpenseForm({
           </div>
         </div>
 
+        <FormField
+          id="expense-date"
+          label="Tanggal"
+          required
+          error={fieldErrors.date}
+          helperText="Tanggal hari ini dipilih secara otomatis."
+        >
+          <input
+            ref={dateRef}
+            type="date"
+            name="date"
+            value={values.date}
+            onChange={handleDateChange}
+            disabled={isSubmitting}
+            className="scroll-mb-48"
+          />
+        </FormField>
+
         <details
           open={detailsOpen}
           onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
@@ -102,7 +123,7 @@ export default function ExpenseForm({
             <span className="min-w-0 flex-1">
               <span className="block">Detail tambahan</span>
               <span className="block text-sm font-normal text-[var(--color-text-muted)]">
-                Tanggal, deskripsi, dan struk
+                Deskripsi dan struk
               </span>
             </span>
             <ChevronDown
@@ -112,24 +133,6 @@ export default function ExpenseForm({
           </summary>
 
           <div className="space-y-4 border-t border-[var(--color-border)] px-4 py-4 sm:px-5 sm:py-5">
-            <FormField
-              id="expense-date"
-              label="Tanggal"
-              required
-              error={fieldErrors.date}
-              helperText="Tanggal hari ini dipilih secara otomatis."
-            >
-              <input
-                ref={dateRef}
-                type="date"
-                name="date"
-                value={values.date}
-                onChange={handleDateChange}
-                disabled={isSubmitting}
-                className="scroll-mb-48"
-              />
-            </FormField>
-
             <FormField
               id="expense-description"
               label="Deskripsi"
@@ -173,36 +176,58 @@ export default function ExpenseForm({
           </StatusBanner>
         ) : null}
 
-        <div
-          className="sticky z-[var(--z-sticky)] -mx-4 border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 py-3 group-focus-within/expense-form:static md:static md:mx-0 md:rounded-[var(--radius-surface)] md:border md:shadow-[var(--elevation-1)]"
-          style={{
-            bottom:
-              "calc(var(--mobile-navigation-height, 4.5rem) + env(safe-area-inset-bottom, 0px))",
-          }}
-        >
-          <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={isSubmitting}
-              loadingLabel="Simpan pengeluaran"
-              className="w-full sm:w-auto sm:min-w-56"
-            >
-              Simpan pengeluaran
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleCancel}
-              disabled={isSubmitting}
-              className="w-full sm:w-auto"
-            >
-              Batal
-            </Button>
-          </div>
+        {actionPlacement === "inline" ? (
+          <div
+            className="sticky z-[var(--z-sticky)] -mx-4 border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 py-3 group-focus-within/expense-form:static md:static md:mx-0 md:rounded-[var(--radius-surface)] md:border md:shadow-[var(--elevation-1)]"
+            style={{
+              bottom:
+                "calc(var(--mobile-navigation-height, 4.5rem) + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
+            <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isSubmitting}
+                loadingLabel="Simpan pengeluaran"
+                className="w-full sm:w-auto sm:min-w-56"
+              >
+                Simpan pengeluaran
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto"
+              >
+                Batal
+              </Button>
+            </div>
 
+            <p
+              className="mt-2 flex min-h-5 items-center gap-2 text-sm text-[var(--color-text-muted)]"
+              role="status"
+              aria-live="polite"
+            >
+              {phaseMessage ? (
+                <>
+                  <LoaderCircle
+                    className="size-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                  {phaseMessage}
+                </>
+              ) : (
+                <span aria-hidden="true">&nbsp;</span>
+              )}
+            </p>
+          </div>
+        ) : null}
+
+        {actionPlacement === "external" ? (
           <p
-            className="mt-2 flex min-h-5 items-center gap-2 text-sm text-[var(--color-text-muted)]"
+            className="flex min-h-5 items-center gap-2 text-sm text-[var(--color-text-muted)]"
             role="status"
             aria-live="polite"
           >
@@ -218,7 +243,7 @@ export default function ExpenseForm({
               <span aria-hidden="true">&nbsp;</span>
             )}
           </p>
-        </div>
+        ) : null}
       </form>
     </div>
   );

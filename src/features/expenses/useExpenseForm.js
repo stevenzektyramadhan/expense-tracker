@@ -304,8 +304,6 @@ export default function useExpenseForm({
   useEffect(() => {
     if (!focusTarget) return;
 
-    if (focusTarget === "date" && !detailsOpen) return;
-
     const refs = {
       amount: amountRef,
       category: categoryRef,
@@ -313,7 +311,7 @@ export default function useExpenseForm({
     };
     refs[focusTarget]?.current?.focus();
     setFocusTarget(null);
-  }, [detailsOpen, focusTarget]);
+  }, [focusTarget]);
 
   const clearRetryStateForChangedPayload = () => {
     invalidateUploadedReceiptCache();
@@ -436,10 +434,6 @@ export default function useExpenseForm({
     const firstInvalidField = ["amount", "category", "date"].find(
       (field) => errors[field],
     );
-
-    if (firstInvalidField === "date") {
-      setDetailsOpen(true);
-    }
 
     if (firstInvalidField) {
       setFocusTarget(firstInvalidField);
