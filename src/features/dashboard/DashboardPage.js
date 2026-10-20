@@ -21,6 +21,8 @@ import CategoryBudgetSection from "./CategoryBudgetSection";
 import RecentTransactions from "./RecentTransactions";
 import SpendingInsights from "./SpendingInsights";
 
+const QUICK_CAPTURE_FORM_ID = "dashboard-quick-capture-expense-form";
+
 function ProfileCompletionPrompt({ onDismiss, onSave }) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState("");
@@ -245,9 +247,33 @@ export default function DashboardPage({
         size="lg"
         title="Tambah pengeluaran"
         description="Catat pengeluaran tanpa meninggalkan ringkasan keuangan."
+        footer={
+          <div className="flex w-full flex-col gap-2 sm:flex-row-reverse sm:justify-start">
+            <Button
+              type="submit"
+              form={QUICK_CAPTURE_FORM_ID}
+              variant="primary"
+              isLoading={isQuickCaptureSubmitting}
+              loadingLabel="Simpan pengeluaran"
+              fullWidth
+              className="sm:w-auto sm:min-w-56"
+            >
+              Simpan pengeluaran
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setQuickCaptureOpen(false)}
+              disabled={isQuickCaptureSubmitting}
+              fullWidth
+              className="sm:w-auto"
+            >
+              Batal
+            </Button>
+          </div>
+        }
       >
         <ExpenseForm
-          onCancel={() => setQuickCaptureOpen(false)}
           onSuccess={() => {
             setIsQuickCaptureSubmitting(false);
             setQuickCaptureOpen(false);
@@ -256,6 +282,8 @@ export default function DashboardPage({
           onSubmittingChange={setIsQuickCaptureSubmitting}
           frequentExpenseCategories={frequentExpenseCategories}
           showHeader={false}
+          actionPlacement="external"
+          formId={QUICK_CAPTURE_FORM_ID}
         />
       </Dialog>
 
