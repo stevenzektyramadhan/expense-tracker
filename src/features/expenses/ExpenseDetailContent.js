@@ -20,7 +20,7 @@ export const defaultExpenseDetailLabels = {
   noDescription: "Tanpa deskripsi",
   noReceipt: "Tidak ada foto struk",
   zoom: "Perbesar struk",
-  edit: "Edit",
+  edit: "Ubah",
   delete: "Hapus",
   close: "Tutup",
 };

@@ -95,10 +95,11 @@ export default function ExpenseForm({
 
         <FormField
           id="expense-date"
+          className="rounded-[var(--radius-control)] bg-[var(--color-surface-subtle)] p-3 sm:p-3.5"
           label="Tanggal"
           required
           error={fieldErrors.date}
-          helperText="Tanggal hari ini dipilih secara otomatis."
+           helperText="Hari ini dipilih otomatis; tetap dapat diubah."
         >
           <input
             ref={dateRef}
@@ -107,7 +108,7 @@ export default function ExpenseForm({
             value={values.date}
             onChange={handleDateChange}
             disabled={isSubmitting}
-            className="scroll-mb-48"
+             className="scroll-mb-48 text-sm"
           />
         </FormField>
 

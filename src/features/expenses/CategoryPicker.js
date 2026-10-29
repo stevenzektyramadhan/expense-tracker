@@ -37,7 +37,7 @@ export default function CategoryPicker({
       </FormField>
 
       {frequentCategories.length > 0 ? (
-        <div className="mt-3" aria-label="Kategori yang sering digunakan">
+        <div className="mt-3" role="group" aria-label="Kategori yang sering digunakan">
           <p className="mb-2 text-sm font-semibold text-[var(--color-text)]">
             Sering digunakan
           </p>
