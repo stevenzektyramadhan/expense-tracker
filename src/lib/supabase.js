@@ -1,17 +1,38 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-// =============================================================================
-// BROWSER CLIENT (for Client Components - "use client")
-// =============================================================================
-// This client is used in React components that run in the browser.
-// It automatically handles session persistence via cookies.
-
-export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+async function browserAuthLock(name, acquireTimeout, fn) {
+  if (typeof navigator === "undefined" || !navigator.locks?.request) {
+    return await fn();
+  }
+  const options =
+    acquireTimeout === 0
+      ? { mode: "exclusive", ifAvailable: true }
+      : { mode: "exclusive" };
+  return await navigator.locks.request(name, options, async (lock) => {
+    if (!lock) return undefined;
+    return await fn();
+  });
 }
 
-// Export a singleton instance for convenience in client components
+let browserClient = null;
+
+export function createClient() {
+  if (typeof window !== "undefined" && browserClient) {
+    return browserClient;
+  }
+  const client = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: {
+        lock: browserAuthLock,
+      },
+    }
+  );
+  if (typeof window !== "undefined") {
+    browserClient = client;
+  }
+  return client;
+}
+
 export const supabase = createClient();

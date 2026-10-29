@@ -25,23 +25,19 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 const { Pool } = pg;
 
-// Get the database connection URL from environment variables
-// DIRECT_URL is typically used for direct database connections (bypassing poolers)
-// DATABASE_URL is the fallback if DIRECT_URL is not set
-const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL ?? process.env.DIRECT_URL;
 
 export const transactionOptions = {
   maxWait: 10_000,
 };
 
-// =============================================================================
-// Factory function to create PrismaClient with the PostgreSQL adapter
-// =============================================================================
 const prismaClientSingleton = () => {
-  // Create a connection pool to PostgreSQL
-  // The pool manages multiple connections and handles reconnection automatically
+  // ponytail: cap serverless pool at max: 3 to avoid exhausting Supabase pooler limits; tune via env if traffic grows
   const pool = new Pool({
     connectionString: connectionString,
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
   });
 
   // Create the PostgreSQL adapter using the pool
@@ -69,13 +65,6 @@ const globalForPrisma = globalThis;
 // This prevents connection buildup during Next.js hot-reloads in development
 const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
 
-// Export the singleton instance - all API routes will import this same instance
 export default prisma;
 
-// In development mode, store the instance in globalThis so it persists
-// across hot-reloads. In production, this isn't needed because there's
-// no hot-reloading, but it doesn't hurt to have it.
-if (process.env.NODE_ENV !== "production") {
-  // Store in global so the next hot-reload reuses the same instance
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
