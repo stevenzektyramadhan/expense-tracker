@@ -1,20 +1,17 @@
-import prisma from "@/lib/prisma";
+import prisma, { transactionOptions } from "@/lib/prisma";
+import {
+  parseFinanceDate,
+  parsePositiveAmount,
+  validateTextLength,
+} from "@/lib/financeValidation.mjs";
 import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
-const resolveAllowanceForDate = async (tx, userId, date) => {
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
-
-  const existing = await tx.allowances.findFirst({
-    where: {
-      user_id: userId,
-      month,
-      year,
-    },
+const resolveAllowanceForDate = async (tx, userId, { month, year }) => {
+  const allowance = await tx.allowances.findFirst({
+    where: { user_id: userId, month, year },
   });
-
-  if (existing) return existing;
+  if (allowance) return allowance;
 
   return tx.allowances.create({
     data: {
@@ -28,37 +25,28 @@ const resolveAllowanceForDate = async (tx, userId, date) => {
   });
 };
 
-const applyAllowanceDelta = async (tx, allowanceId, delta) => {
-  const allowance = await tx.allowances.findUnique({
-    where: { id: allowanceId },
+const applyAllowanceDelta = async (tx, userId, allowanceId, delta) => {
+  const allowance = await tx.allowances.findFirst({
+    where: { id: allowanceId, user_id: userId },
   });
-
   if (!allowance) {
-    return {
-      status: 404,
-      payload: { error: "Allowance not found" },
-    };
+    return { status: 404, payload: { error: "Allowance not found" } };
   }
 
   const nextAmount = Number(allowance.amount) + delta;
   const nextRemaining = Number(allowance.remaining) + delta;
-
   if (nextAmount < 0 || nextRemaining < 0) {
     return {
       status: 400,
-      payload: {
-        error: "Pendapatan tidak dapat diubah karena saldo sudah terpakai.",
-      },
+      payload: { error: "Pendapatan tidak dapat diubah karena saldo sudah terpakai." },
     };
   }
-
-  const normalizedRemaining = Math.min(nextRemaining, nextAmount);
 
   const updatedAllowance = await tx.allowances.update({
     where: { id: allowance.id },
     data: {
-      amount: nextAmount,
-      remaining: normalizedRemaining,
+      amount: { increment: delta },
+      remaining: { increment: delta },
       updated_at: new Date(),
     },
   });
@@ -73,6 +61,28 @@ const applyAllowanceDelta = async (tx, allowanceId, delta) => {
   };
 };
 
+const validateIncomeInput = (amount, source, note, date) => {
+  const parsedAmount = parsePositiveAmount(amount);
+  if (!parsedAmount.ok) return parsedAmount;
+
+  const parsedDate = parseFinanceDate(date);
+  if (!parsedDate.ok) return parsedDate;
+
+  const parsedSource = validateTextLength(source, 150, "Sumber pendapatan", { required: true });
+  if (!parsedSource.ok) return parsedSource;
+
+  const parsedNote = validateTextLength(note, 500, "Catatan");
+  if (!parsedNote.ok) return parsedNote;
+
+  return {
+    ok: true,
+    amount: parsedAmount.amount,
+    date: parsedDate,
+    note: parsedNote.value,
+    source: parsedSource.value,
+  };
+};
+
 export async function PUT(req, { params }) {
   try {
     const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
@@ -80,112 +90,76 @@ export async function PUT(req, { params }) {
     const originError = requireAllowedMutationOrigin(req, authMethod);
     if (originError) return originError;
 
-    const resolvedParams = await params;
-    const incomeId = resolvedParams?.id;
-    if (!incomeId) {
-      return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
-    }
+    const incomeId = (await params)?.id;
+    if (!incomeId) return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
 
     const { amount, source, note, date } = await req.json();
-
-    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
-        status: 400,
-      });
-    }
-
-    const incomeDate = date ? new Date(date) : null;
-    if (!incomeDate || Number.isNaN(incomeDate.getTime())) {
-      return new Response(JSON.stringify({ error: "date is invalid" }), { status: 400 });
-    }
-
-    const roundedAmount = Math.round(amount);
+    const input = validateIncomeInput(amount, source, note, date);
+    if (!input.ok) return new Response(JSON.stringify({ error: input.error }), { status: 400 });
 
     const result = await prisma.$transaction(async (tx) => {
       const existingIncome = await tx.additional_incomes.findFirst({
-        where: {
-          id: incomeId,
-          user_id: user.id,
-        },
+        where: { id: incomeId, user_id: user.id },
       });
+      if (!existingIncome) return { status: 404, payload: { error: "Income not found" } };
 
-      if (!existingIncome) {
-        return {
-          status: 404,
-          payload: { error: "Income not found" },
-        };
-      }
-
-      const oldMonth = existingIncome.date.getMonth();
-      const oldYear = existingIncome.date.getFullYear();
-      const newMonth = incomeDate.getMonth();
-      const newYear = incomeDate.getFullYear();
-      const isSamePeriod = oldMonth === newMonth && oldYear === newYear;
+      const isSamePeriod = existingIncome.date.getMonth() === input.date.date.getMonth()
+        && existingIncome.date.getFullYear() === input.date.date.getFullYear();
 
       if (isSamePeriod) {
-        const delta = roundedAmount - existingIncome.amount;
-        const allowanceResult = await applyAllowanceDelta(tx, existingIncome.allowance_id, delta);
+        const allowance = await applyAllowanceDelta(
+          tx,
+          user.id,
+          existingIncome.allowance_id,
+          input.amount - existingIncome.amount,
+        );
+        if (allowance.status !== 200) return allowance;
 
-        if (allowanceResult.status !== 200) {
-          return allowanceResult;
-        }
-
-        const updatedIncome = await tx.additional_incomes.update({
+        const income = await tx.additional_incomes.update({
           where: { id: existingIncome.id },
           data: {
-            amount: roundedAmount,
-            source: source || null,
-            note: note || null,
-            date: incomeDate,
+            amount: input.amount,
+            source: input.source,
+            note: input.note,
+            date: input.date.date,
             updated_at: new Date(),
           },
         });
 
-        return {
-          status: 200,
-          payload: {
-            income: updatedIncome,
-            allowance: allowanceResult.payload,
-          },
-        };
+        return { status: 200, payload: { income, allowance: allowance.payload } };
       }
 
-      const rollbackOldAllowance = await applyAllowanceDelta(tx, existingIncome.allowance_id, -existingIncome.amount);
-      if (rollbackOldAllowance.status !== 200) {
-        return rollbackOldAllowance;
-      }
+      const rollback = await applyAllowanceDelta(
+        tx,
+        user.id,
+        existingIncome.allowance_id,
+        -existingIncome.amount,
+      );
+      if (rollback.status !== 200) return rollback;
 
-      const targetAllowance = await resolveAllowanceForDate(tx, user.id, incomeDate);
-      const applyNewAllowance = await applyAllowanceDelta(tx, targetAllowance.id, roundedAmount);
-      if (applyNewAllowance.status !== 200) {
-        return applyNewAllowance;
-      }
+      const targetAllowance = await resolveAllowanceForDate(tx, user.id, input.date);
+      const allowance = await applyAllowanceDelta(tx, user.id, targetAllowance.id, input.amount);
+      if (allowance.status !== 200) return allowance;
 
-      const updatedIncome = await tx.additional_incomes.update({
+      const income = await tx.additional_incomes.update({
         where: { id: existingIncome.id },
         data: {
           allowance_id: targetAllowance.id,
-          amount: roundedAmount,
-          source: source || null,
-          note: note || null,
-          date: incomeDate,
+          amount: input.amount,
+          source: input.source,
+          note: input.note,
+          date: input.date.date,
           updated_at: new Date(),
         },
       });
 
-      return {
-        status: 200,
-        payload: {
-          income: updatedIncome,
-          allowance: applyNewAllowance.payload,
-        },
-      };
-    });
+      return { status: 200, payload: { income, allowance: allowance.payload } };
+    }, transactionOptions);
 
     return new Response(JSON.stringify(result.payload), { status: result.status });
-  } catch (err) {
-    console.error("Incomes PUT error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  } catch (error) {
+    console.error("Incomes PUT error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }
 
@@ -196,48 +170,30 @@ export async function DELETE(req, { params }) {
     const originError = requireAllowedMutationOrigin(req, authMethod);
     if (originError) return originError;
 
-    const resolvedParams = await params;
-    const incomeId = resolvedParams?.id;
-    if (!incomeId) {
-      return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
-    }
+    const incomeId = (await params)?.id;
+    if (!incomeId) return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
 
     const result = await prisma.$transaction(async (tx) => {
       const existingIncome = await tx.additional_incomes.findFirst({
-        where: {
-          id: incomeId,
-          user_id: user.id,
-        },
+        where: { id: incomeId, user_id: user.id },
       });
+      if (!existingIncome) return { status: 404, payload: { error: "Income not found" } };
 
-      if (!existingIncome) {
-        return {
-          status: 404,
-          payload: { error: "Income not found" },
-        };
-      }
+      const allowance = await applyAllowanceDelta(
+        tx,
+        user.id,
+        existingIncome.allowance_id,
+        -existingIncome.amount,
+      );
+      if (allowance.status !== 200) return allowance;
 
-      const allowanceResult = await applyAllowanceDelta(tx, existingIncome.allowance_id, -existingIncome.amount);
-      if (allowanceResult.status !== 200) {
-        return allowanceResult;
-      }
-
-      await tx.additional_incomes.delete({
-        where: { id: existingIncome.id },
-      });
-
-      return {
-        status: 200,
-        payload: {
-          success: true,
-          allowance: allowanceResult.payload,
-        },
-      };
-    });
+      await tx.additional_incomes.delete({ where: { id: existingIncome.id } });
+      return { status: 200, payload: { success: true, allowance: allowance.payload } };
+    }, transactionOptions);
 
     return new Response(JSON.stringify(result.payload), { status: result.status });
-  } catch (err) {
-    console.error("Incomes DELETE error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  } catch (error) {
+    console.error("Incomes DELETE error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }
