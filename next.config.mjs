@@ -12,11 +12,15 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://res.cloudinary.com",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+       `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
       "connect-src 'self' https://*.supabase.co",
       "worker-src 'self' blob:",
       "manifest-src 'self'",
     ].join("; "),
+  },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
   },
   {
     key: "Referrer-Policy",
