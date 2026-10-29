@@ -92,7 +92,17 @@ export default function SummaryPage() {
   });
   const activeRequestRef = useRef(null);
   const exportRequestRef = useRef(null);
+  const adviceRequestRef = useRef(null);
   const [exportState, setExportState] = useState({
+    status: "idle",
+    message: "",
+  });
+  const [adviceByMonth, setAdviceByMonth] = useState({});
+  const [adviceState, setAdviceState] = useState({
+    status: "idle",
+    message: "",
+  });
+  const [budgetActionState, setBudgetActionState] = useState({
     status: "idle",
     message: "",
   });
@@ -201,12 +211,100 @@ export default function SummaryPage() {
     }
   }, [selectedMonth]);
 
+  const requestMonthAdvice = useCallback(async () => {
+    if (!selectedMonth) return;
+
+    adviceRequestRef.current?.abort();
+    const controller = new AbortController();
+    adviceRequestRef.current = controller;
+    setAdviceState({ status: "loading", message: "" });
+
+    try {
+      const query = new URLSearchParams({ month: selectedMonth });
+      const response = await authenticatedFetch(
+        `/api/summary/advice?${query}`,
+        { signal: controller.signal },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          getSafeSummaryError({
+            message: payload?.error,
+            status: response.status,
+          }),
+        );
+      }
+
+      if (!controller.signal.aborted) {
+        setAdviceByMonth((prev) => ({ ...prev, [selectedMonth]: payload }));
+        setAdviceState({ status: "success", message: "" });
+      }
+    } catch (error) {
+      if (controller.signal.aborted || error?.name === "AbortError") return;
+
+      setAdviceState({
+        status: "error",
+        message:
+          error instanceof Error && error.message
+            ? error.message
+            : "Analisis AI belum dapat dimuat. Coba lagi.",
+      });
+    } finally {
+      if (adviceRequestRef.current === controller) {
+        adviceRequestRef.current = null;
+      }
+    }
+  }, [selectedMonth]);
+
+  const applySuggestedBudget = useCallback(
+    async (action) => {
+      if (!action?.category || !action?.suggestedAmount) return;
+
+      setBudgetActionState({ status: "loading", message: "" });
+      try {
+        const response = await authenticatedFetch("/api/budgets", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            year: action.year,
+            month: action.month,
+            category: action.category,
+            amount: action.suggestedAmount,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            payload?.error || "Batas anggaran belum dapat disimpan.",
+          );
+        }
+
+        setBudgetActionState({
+          status: "success",
+          message: `Batas anggaran ${action.category} (${formatCurrency(action.suggestedAmount)}/bulan) berhasil diterapkan.`,
+        });
+        await requestMonthAdvice();
+      } catch (error) {
+        setBudgetActionState({
+          status: "error",
+          message:
+            error instanceof Error && error.message
+              ? error.message
+              : "Batas anggaran belum dapat disimpan. Coba lagi.",
+        });
+      }
+    },
+    [requestMonthAdvice],
+  );
+
   useEffect(() => {
     fetchSummaryData();
 
     return () => {
       activeRequestRef.current?.abort();
       exportRequestRef.current?.abort();
+      adviceRequestRef.current?.abort();
     };
   }, [fetchSummaryData]);
 
@@ -286,6 +384,13 @@ export default function SummaryPage() {
       onExport={exportSelectedMonth}
       isExporting={exportState.status === "loading"}
       exportError={exportState.status === "error" ? exportState.message : ""}
+      advice={adviceByMonth[selectedMonth] || null}
+      onRequestAdvice={requestMonthAdvice}
+      isLoadingAdvice={adviceState.status === "loading"}
+      adviceError={adviceState.status === "error" ? adviceState.message : ""}
+      onApplyBudgetAction={applySuggestedBudget}
+      isApplyingBudget={budgetActionState.status === "loading"}
+      budgetActionFeedback={budgetActionState}
     />
   );
 }
