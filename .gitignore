@@ -44,6 +44,7 @@ next-env.d.ts
 .omo/
 .playwright-mcp/
 qa/*.png
+.agents
 
 
 
@@ -60,3 +61,8 @@ SECURITY_REVIEW.md
 FINANCE_RULES.md
 REGRESSION_CHECKLIST.md
 DATABASE_PREFLIGHT_CHECKS.sql
+
+
+AGENTS.md
+skills-lock.json
+.agents
