@@ -44,7 +44,7 @@ function CategoryTooltip({ active, payload }) {
 
 export default function CategoryDonutChart({ categories = [] }) {
   return (
-    <div className="h-72 min-w-0" aria-hidden="true">
+    <div className="h-72 min-w-0" aria-hidden="true" tabIndex={-1}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart
           margin={{ top: 16, right: 16, bottom: 16, left: 16 }}
@@ -60,12 +60,15 @@ export default function CategoryDonutChart({ categories = [] }) {
             stroke="var(--color-surface-subtle)"
             strokeWidth={2}
             isAnimationActive={false}
-            rootTabIndex={-1}
+           rootTabIndex={-1}
+           tabIndex={-1}
+           focusable={false}
           >
             {categories.map((category) => (
               <Cell
                 key={category.name}
                 fill={getReportCategoryColor(category.name)}
+                focusable={false}
               />
             ))}
           </Pie>
