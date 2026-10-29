@@ -78,10 +78,10 @@ function IncomeCard({ income, onDelete, onEdit }) {
             size="compact"
             variant="quiet"
             onClick={() => onEdit(income)}
-            aria-label={`Edit pendapatan dari ${source}`}
+            aria-label={`Ubah pendapatan dari ${source}`}
           >
             <Pencil className="size-4" aria-hidden="true" />
-            Edit
+            Ubah
           </Button>
           <Button
             size="compact"
@@ -207,7 +207,7 @@ export default function IncomeList({
                         size="icon"
                         variant="quiet"
                         onClick={() => onEdit(income)}
-                        aria-label={`Edit pendapatan dari ${source}`}
+                        aria-label={`Ubah pendapatan dari ${source}`}
                       >
                         <Pencil className="size-4" aria-hidden="true" />
                       </Button>

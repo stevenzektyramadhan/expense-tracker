@@ -71,7 +71,7 @@ export default function SpendingInsights({ insights }) {
                 <p className="truncate text-base font-bold text-[var(--color-text)]">
                   {largestCategory.category}
                 </p>
-                <span className="rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2 py-0.2 text-[0.6875rem] font-bold text-[var(--color-primary-strong)]">
+                <span className="rounded-[var(--radius-pill)] bg-[var(--color-primary-soft)] px-2 py-0.5 text-[0.6875rem] font-bold text-[var(--color-primary-strong)]">
                   {Math.round(largestCategory.share * 100)}%
                 </span>
               </div>

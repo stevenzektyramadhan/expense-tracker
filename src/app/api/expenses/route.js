@@ -1,21 +1,13 @@
-// =============================================================================
-// EXPENSES API ROUTE - REFACTORED TO USE PRISMA
-// =============================================================================
-// This file handles CRUD operations for the 'expenses' table.
-// When an expense is created, it also deducts from the user's monthly allowance.
-// =============================================================================
-
-// Import our Prisma singleton - this ensures we reuse the same database connection
-import prisma from "@/lib/prisma";
+import prisma, { transactionOptions } from "@/lib/prisma";
+import {
+  parseFinanceDate,
+  parsePositiveAmount,
+  planExpenseBalanceChange,
+  validateTextLength,
+} from "@/lib/financeValidation.mjs";
 import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { resolveOwnedReceipt } from "@/lib/receiptAsset";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
-
-const clampRemainingBalance = (value, allowanceAmount) => {
-  if (value < 0) return 0;
-  if (value > allowanceAmount) return allowanceAmount;
-  return value;
-};
 
 const parseDateBoundary = (value, { inclusiveEnd = false } = {}) => {
   if (!value) return null;
@@ -23,21 +15,50 @@ const parseDateBoundary = (value, { inclusiveEnd = false } = {}) => {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "invalid";
 
-  if (inclusiveEnd) {
-    date.setDate(date.getDate() + 1);
-  }
-
+  if (inclusiveEnd) date.setDate(date.getDate() + 1);
   return date;
 };
 
-// =============================================================================
-// POST /api/expenses - Create a new expense and deduct from allowance
-// =============================================================================
-// IMPORTANT: This route uses a Prisma TRANSACTION to ensure that:
-// 1. The expense is created
-// 2. The allowance remaining balance is decremented
-// Both operations succeed or fail together (atomicity)
-// =============================================================================
+const transactionErrorResponse = (error) => {
+  if (typeof error?.status !== "number" || typeof error?.message !== "string") {
+    return null;
+  }
+
+  return new Response(JSON.stringify({ error: error.message }), { status: error.status });
+};
+
+const validateExpenseInput = (amount, category, description, date) => {
+  const parsedAmount = parsePositiveAmount(amount);
+  if (!parsedAmount.ok) return parsedAmount;
+
+  const parsedDate = parseFinanceDate(date);
+  if (!parsedDate.ok) return parsedDate;
+
+  const parsedCategory = validateTextLength(category, 100, "Kategori", { required: true });
+  if (!parsedCategory.ok) return parsedCategory;
+
+  const parsedDescription = validateTextLength(description, 500, "Deskripsi");
+  if (!parsedDescription.ok) return parsedDescription;
+
+  return {
+    ok: true,
+    amount: parsedAmount.amount,
+    category: parsedCategory.value,
+    date: parsedDate,
+    description: parsedDescription.value ?? "",
+  };
+};
+
+const resolveReceipt = async (receiptPublicId, userId) => {
+  if (receiptPublicId === undefined || receiptPublicId === null) return null;
+  if (!receiptPublicId || typeof receiptPublicId !== "string") {
+    return { error: "receipt_public_id is invalid" };
+  }
+
+  const receipt = await resolveOwnedReceipt(receiptPublicId, userId);
+  return receipt ?? { error: "Receipt is invalid or does not belong to this user" };
+};
+
 export async function POST(req) {
   try {
     const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
@@ -45,156 +66,63 @@ export async function POST(req) {
     const originError = requireAllowedMutationOrigin(req, authMethod);
     if (originError) return originError;
 
-    // Parse the JSON body from the request
-    const { amount, description, category, date, receipt_public_id } = await req.json();
+    const { amount, description, category, date, receipt_public_id: receiptPublicId } = await req.json();
+    const input = validateExpenseInput(amount, category, description, date);
+    if (!input.ok) return new Response(JSON.stringify({ error: input.error }), { status: 400 });
 
-    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
-        status: 400,
+    const receipt = await resolveReceipt(receiptPublicId, user.id);
+    if (receipt?.error) return new Response(JSON.stringify({ error: receipt.error }), { status: 400 });
+
+    const expense = await prisma.$transaction(async (tx) => {
+      const allowance = await tx.allowances.findFirst({
+        where: {
+          user_id: user.id,
+          month: input.date.month,
+          year: input.date.year,
+        },
       });
-    }
 
-    if (!category || !date) {
-      return new Response(JSON.stringify({ error: "category and date are required" }), {
-        status: 400,
-      });
-    }
-
-    let receipt = null;
-    if (receipt_public_id !== undefined && receipt_public_id !== null) {
-      if (!receipt_public_id || typeof receipt_public_id !== "string") {
-        return new Response(JSON.stringify({ error: "receipt_public_id is invalid" }), { status: 400 });
+      if (!allowance) {
+        throw { status: 400, message: "Allowance bulan ini belum dibuat" };
+      }
+      if (Number(allowance.remaining) < input.amount) {
+        throw { status: 400, message: "Saldo tidak cukup! Hemat pangkal kaya." };
       }
 
-      receipt = await resolveOwnedReceipt(receipt_public_id, user.id);
-      if (!receipt) {
-        return new Response(JSON.stringify({ error: "Receipt is invalid or does not belong to this user" }), {
-          status: 400,
-        });
-      }
-    }
-
-    // Get current month and year for finding the active allowance
-    const now = new Date();
-    const month = now.getMonth() + 1; // JavaScript months are 0-indexed (0-11), so add 1
-    const year = now.getFullYear();
-
-    // =========================================================================
-    // STEP 1: Find the active allowance for this month
-    // =========================================================================
-    // We need to find the allowance BEFORE the transaction because we need to:
-    // 1. Check if it exists
-    // 2. Get its ID for linking the expense
-    // 3. Get the current remaining balance for calculation
-    const allowance = await prisma.allowances.findFirst({
-      where: {
-        user_id: user.id,
-        month: month,
-        year: year,
-      },
-    });
-
-    // If no allowance exists for this month, we can't create an expense
-    // The user must create an allowance first
-    if (!allowance) {
-      return new Response(
-        JSON.stringify({ error: "Allowance bulan ini belum dibuat" }),
-        { status: 400 }
-      );
-    }
-
-    // =========================================================================
-    // STEP 2: Round the amount to Integer (CRITICAL!)
-    // =========================================================================
-    // The 'expenses' table has an 'amount' column of type INTEGER (int4)
-    // If the user sends a float like 150000.75, we MUST round it
-    // Math.round() rounds to nearest integer (150000.75 -> 150001)
-    // Alternative: Math.floor() would truncate (150000.75 -> 150000)
-    const roundedAmount = Math.round(amount);
-
-    // =========================================================================
-    // STEP 3: Calculate new remaining balance
-    // =========================================================================
-    // allowance.remaining is a Prisma Decimal object
-    // We need to convert it to a Number for arithmetic operations
-    // Then we subtract the expense amount to get the new balance
-    const currentRemaining = Number(allowance.remaining);
-    const newRemaining = currentRemaining - roundedAmount;
-
-    // =========================================================================
-    // STEP 3.5: BALANCE VALIDATION - Prevent negative balance
-    // =========================================================================
-    // Check if the user has sufficient balance before allowing the expense
-    // This prevents overspending beyond the allocated monthly allowance
-    if (newRemaining < 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Saldo tidak cukup! Hemat pangkal kaya.",
-          currentBalance: currentRemaining,
-          requestedAmount: roundedAmount 
-        }),
-        { status: 400 }
-      );
-    }
-
-    // =========================================================================
-    // STEP 4: Use a TRANSACTION for atomic operations
-    // =========================================================================
-    // prisma.$transaction() ensures that ALL operations inside either:
-    // - ALL succeed (commit)
-    // - ALL fail (rollback)
-    // This prevents scenarios where expense is created but allowance isn't updated
-    // (which would cause the balance to be incorrect)
-    const result = await prisma.$transaction(async (tx) => {
-      // Transaction Step A: Create the expense record
-      // Using 'tx' (transaction client) instead of 'prisma' to ensure
-      // this operation is part of the transaction
-      const newExpense = await tx.expenses.create({
+      const createdExpense = await tx.expenses.create({
         data: {
           user_id: user.id,
-          amount: roundedAmount,       // Using rounded integer value
-          description: description,
-          category: category,
-          date: new Date(date),        // Convert date string to Date object
-          allowance_id: allowance.id,  // Link expense to the allowance
-          receipt_url: receipt?.secureUrl || null,
-          receipt_public_id: receipt?.publicId || null,
-          // createdAt is auto-set by database default
+          amount: input.amount,
+          description: input.description,
+          category: input.category,
+          date: input.date.date,
+          allowance_id: allowance.id,
+          receipt_url: receipt?.secureUrl ?? null,
+          receipt_public_id: receipt?.publicId ?? null,
         },
       });
 
-      // Transaction Step B: Update the allowance's remaining balance
-      // Using 'tx' to ensure this is part of the same transaction
       await tx.allowances.update({
-        where: {
-          id: allowance.id,  // Find the allowance by its ID
-        },
+        where: { id: allowance.id },
         data: {
-          remaining: newRemaining,  // Set the new remaining balance
-          updated_at: new Date(),   // Update the timestamp
+          remaining: { decrement: input.amount },
+          updated_at: new Date(),
         },
       });
 
-      // Return the created expense from the transaction
-      // This will be the value of 'result' after the transaction commits
-      return newExpense;
-    });
+      return createdExpense;
+    }, transactionOptions);
 
-    // Transaction committed successfully!
-    // Return the created expense data
-    return new Response(JSON.stringify(result), { status: 200 });
-  } catch (err) {
-    // If any error occurs (including transaction rollback), log and return error
-    console.error("Expenses POST error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return new Response(JSON.stringify(expense), { status: 200 });
+  } catch (error) {
+    const expectedError = transactionErrorResponse(error);
+    if (expectedError) return expectedError;
+
+    console.error("Expenses POST error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }
 
-// =============================================================================
-// GET /api/expenses - Fetch expenses for a user
-// =============================================================================
-// Query params: user_id (required)
-// Returns all expenses for the user, ordered by date descending (newest first)
 export async function GET(req) {
   try {
     const { user, errorResponse } = await requireAuthenticatedUser(req);
@@ -203,7 +131,6 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const startDate = parseDateBoundary(searchParams.get("startDate"));
     const endDate = parseDateBoundary(searchParams.get("endDate"), { inclusiveEnd: true });
-
     if (startDate === "invalid" || endDate === "invalid") {
       return new Response(JSON.stringify({ error: "Invalid date filter" }), { status: 400 });
     }
@@ -212,38 +139,21 @@ export async function GET(req) {
     if (startDate) dateFilter.gte = startDate;
     if (endDate) dateFilter.lt = endDate;
 
-    // =========================================================================
-    // Fetch all expenses for the user
-    // =========================================================================
-    // Using findMany to get multiple records (unlike findFirst for single record)
-    // orderBy specifies the sort order - newest expenses first
     const expenses = await prisma.expenses.findMany({
       where: {
         user_id: user.id,
         ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
       },
-      orderBy: {
-        date: "desc",  // Sort by date descending (newest first)
-      },
+      orderBy: { date: "desc" },
     });
 
-    // Return the expenses array
-    // Note: expenses.amount is already an Integer, no conversion needed
     return new Response(JSON.stringify(expenses), { status: 200 });
-  } catch (err) {
-    console.error("Expenses GET error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  } catch (error) {
+    console.error("Expenses GET error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }
 
-// =============================================================================
-// PUT /api/expenses - Update an existing expense and re-sync allowance
-// =============================================================================
-// Request body: { id, amount, category, date, description }
-// Rules:
-// - Expense must belong to authenticated user
-// - If expense is linked to an allowance, update allowance.remaining by delta
-// - Reject if updated amount would make balance negative
 export async function PUT(req) {
   try {
     const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
@@ -251,103 +161,105 @@ export async function PUT(req) {
     const originError = requireAllowedMutationOrigin(req, authMethod);
     if (originError) return originError;
 
-    const { id, amount, category, date, description } = await req.json();
-
+    const { id, amount, category, date, description, receipt_public_id: receiptPublicId } = await req.json();
     if (!id || typeof id !== "string") {
       return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
     }
 
-    if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-      return new Response(JSON.stringify({ error: "amount must be a positive number" }), {
-        status: 400,
-      });
-    }
+    const input = validateExpenseInput(amount, category, description, date);
+    if (!input.ok) return new Response(JSON.stringify({ error: input.error }), { status: 400 });
 
-    if (!category || !date) {
-      return new Response(JSON.stringify({ error: "category and date are required" }), {
-        status: 400,
-      });
-    }
+    const receipt = await resolveReceipt(receiptPublicId, user.id);
+    if (receipt?.error) return new Response(JSON.stringify({ error: receipt.error }), { status: 400 });
 
-    const roundedAmount = Math.round(amount);
+    const expense = await prisma.$transaction(async (tx) => {
+      const existingExpense = await tx.expenses.findUnique({ where: { id } });
+      if (!existingExpense || existingExpense.user_id !== user.id) {
+        throw { status: 404, message: "Expense not found" };
+      }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const existingExpense = await tx.expenses.findFirst({
+      const currentAllowance = existingExpense.allowance_id
+        ? await tx.allowances.findFirst({
+            where: { id: existingExpense.allowance_id, user_id: user.id },
+          })
+        : null;
+      const targetAllowance = await tx.allowances.findFirst({
         where: {
-          id,
           user_id: user.id,
+          month: input.date.month,
+          year: input.date.year,
         },
       });
 
-      if (!existingExpense) {
-        return {
-          status: 404,
-          payload: { error: "Expense not found" },
-        };
+      if (!targetAllowance) {
+        throw { status: 400, message: "Allowance bulan ini belum dibuat" };
       }
 
-      if (existingExpense.allowance_id) {
-        const allowance = await tx.allowances.findUnique({
-          where: { id: existingExpense.allowance_id },
+      const balanceChange = planExpenseBalanceChange({
+        existingAmount: Number(existingExpense.amount),
+        existingAllowanceId: currentAllowance?.id ?? null,
+        nextAmount: input.amount,
+        targetAllowance,
+      });
+
+      if (balanceChange.isSamePeriod) {
+        if (balanceChange.difference > 0 && Number(targetAllowance.remaining) < balanceChange.difference) {
+          throw { status: 400, message: "Saldo tidak cukup! Hemat pangkal kaya." };
+        }
+
+        await tx.allowances.update({
+          where: { id: targetAllowance.id },
+          data: {
+            remaining: { decrement: balanceChange.difference },
+            updated_at: new Date(),
+          },
         });
-
-        if (allowance) {
-          const currentRemaining = Number(allowance.remaining);
-          const allowanceAmount = Number(allowance.amount);
-          const delta = roundedAmount - existingExpense.amount;
-          const proposedRemaining = currentRemaining - delta;
-
-          if (proposedRemaining < 0) {
-            return {
-              status: 400,
-              payload: {
-                error: "Saldo tidak cukup! Hemat pangkal kaya.",
-                currentBalance: currentRemaining,
-                requestedDelta: delta,
-              },
-            };
-          }
-
+      } else {
+        if (Number(targetAllowance.remaining) < input.amount) {
+          throw { status: 400, message: "Saldo tidak cukup! Hemat pangkal kaya." };
+        }
+        if (currentAllowance) {
           await tx.allowances.update({
-            where: { id: allowance.id },
+            where: { id: currentAllowance.id },
             data: {
-              remaining: clampRemainingBalance(proposedRemaining, allowanceAmount),
+              remaining: { increment: Number(existingExpense.amount) },
               updated_at: new Date(),
             },
           });
         }
+        await tx.allowances.update({
+          where: { id: targetAllowance.id },
+          data: {
+            remaining: { decrement: input.amount },
+            updated_at: new Date(),
+          },
+        });
       }
 
-      const updatedExpense = await tx.expenses.update({
+      return tx.expenses.update({
         where: { id: existingExpense.id },
         data: {
-          amount: roundedAmount,
-          category,
-          date: new Date(date),
-          description,
+          amount: input.amount,
+          category: input.category,
+          description: input.description,
+          date: input.date.date,
+          allowance_id: targetAllowance.id,
+          receipt_url: receipt?.secureUrl ?? existingExpense.receipt_url,
+          receipt_public_id: receipt?.publicId ?? existingExpense.receipt_public_id,
         },
       });
+    }, transactionOptions);
 
-      return {
-        status: 200,
-        payload: updatedExpense,
-      };
-    });
+    return new Response(JSON.stringify(expense), { status: 200 });
+  } catch (error) {
+    const expectedError = transactionErrorResponse(error);
+    if (expectedError) return expectedError;
 
-    return new Response(JSON.stringify(result.payload), { status: result.status });
-  } catch (err) {
-    console.error("Expenses PUT error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    console.error("Expenses PUT error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }
 
-// =============================================================================
-// DELETE /api/expenses - Delete expense and refund allowance balance
-// =============================================================================
-// Request body: { id }
-// Rules:
-// - Expense must belong to authenticated user
-// - If linked to an allowance, add amount back to allowance.remaining
 export async function DELETE(req) {
   try {
     const { user, authMethod, errorResponse } = await requireAuthenticatedUser(req);
@@ -356,59 +268,40 @@ export async function DELETE(req) {
     if (originError) return originError;
 
     const { id } = await req.json();
-
     if (!id || typeof id !== "string") {
       return new Response(JSON.stringify({ error: "id is required" }), { status: 400 });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const existingExpense = await tx.expenses.findFirst({
-        where: {
-          id,
-          user_id: user.id,
-        },
-      });
-
-      if (!existingExpense) {
-        return {
-          status: 404,
-          payload: { error: "Expense not found" },
-        };
+    await prisma.$transaction(async (tx) => {
+      const expense = await tx.expenses.findUnique({ where: { id } });
+      if (!expense || expense.user_id !== user.id) {
+        throw { status: 404, message: "Expense not found" };
       }
 
-      if (existingExpense.allowance_id) {
-        const allowance = await tx.allowances.findUnique({
-          where: { id: existingExpense.allowance_id },
+      const allowance = expense.allowance_id
+        ? await tx.allowances.findFirst({
+            where: { id: expense.allowance_id, user_id: user.id },
+          })
+        : null;
+
+      await tx.expenses.delete({ where: { id: expense.id } });
+      if (allowance) {
+        await tx.allowances.update({
+          where: { id: allowance.id },
+          data: {
+            remaining: { increment: Number(expense.amount) },
+            updated_at: new Date(),
+          },
         });
-
-        if (allowance) {
-          const currentRemaining = Number(allowance.remaining);
-          const allowanceAmount = Number(allowance.amount);
-          const refundedRemaining = currentRemaining + existingExpense.amount;
-
-          await tx.allowances.update({
-            where: { id: allowance.id },
-            data: {
-              remaining: clampRemainingBalance(refundedRemaining, allowanceAmount),
-              updated_at: new Date(),
-            },
-          });
-        }
       }
+    }, transactionOptions);
 
-      await tx.expenses.delete({
-        where: { id: existingExpense.id },
-      });
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (error) {
+    const expectedError = transactionErrorResponse(error);
+    if (expectedError) return expectedError;
 
-      return {
-        status: 200,
-        payload: { success: true },
-      };
-    });
-
-    return new Response(JSON.stringify(result.payload), { status: result.status });
-  } catch (err) {
-    console.error("Expenses DELETE error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    console.error("Expenses DELETE error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }

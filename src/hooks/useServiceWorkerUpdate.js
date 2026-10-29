@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function useServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const registrationRef = useRef(null);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return undefined;
@@ -48,6 +49,8 @@ export function useServiceWorkerUpdate() {
     navigator.serviceWorker.ready.then((resolvedRegistration) => {
       if (disposed) return;
       registration = resolvedRegistration;
+      registrationRef.current = registration;
+      if (registration.waiting) setUpdateAvailable(true);
       registration.addEventListener("updatefound", handleUpdateFound);
     });
 
@@ -65,5 +68,10 @@ export function useServiceWorkerUpdate() {
     };
   }, []);
 
-  return updateAvailable;
+  const reloadApp = () => {
+    registrationRef.current?.waiting?.postMessage({ type: "SKIP_WAITING" });
+    window.location.reload();
+  };
+
+  return { reloadApp, updateAvailable };
 }

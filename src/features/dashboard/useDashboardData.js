@@ -437,13 +437,25 @@ export default function useDashboardData({ userId }) {
   );
 
   useEffect(() => {
+    setDiscoveryFilters((currentFilters) => ({
+      ...currentFilters,
+      category: filters.category,
+      month: filters.month,
+      year: filters.year,
+      sort: filters.sort,
+    }));
+  }, [filters.category, filters.month, filters.sort, filters.year]);
+
+  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setDiscoveryFilters(filters);
-    },
-    filters.search === discoveryFilters.search ? 0 : DISCOVERY_SEARCH_DEBOUNCE_MS);
+      setDiscoveryFilters((currentFilters) => ({
+        ...currentFilters,
+        search: filters.search,
+      }));
+    }, DISCOVERY_SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [discoveryFilters.search, filters]);
+  }, [filters.search]);
 
   const filteredExpenses = useMemo(
     () =>

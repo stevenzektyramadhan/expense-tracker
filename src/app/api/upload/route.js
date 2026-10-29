@@ -158,19 +158,14 @@ export async function DELETE(request) {
       );
     }
 
-    await prisma.expenses.update({
-      where: { id: expense.id },
-      data: { receipt_url: null },
-    });
-
     const destroyResult = await destroyReceipt(expense.receipt_public_id);
-    if (destroyResult.result !== "ok" && destroyResult.result !== "not found") {
+    if (destroyResult?.result !== "ok" && destroyResult?.result !== "not found") {
       return NextResponse.json({ error: "Receipt deletion could not be completed. Please retry." }, { status: 502 });
     }
 
     await prisma.expenses.update({
       where: { id: expense.id },
-      data: { receipt_public_id: null },
+      data: { receipt_url: null, receipt_public_id: null },
     });
 
     return NextResponse.json({ success: true });

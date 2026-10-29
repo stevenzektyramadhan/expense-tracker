@@ -147,7 +147,7 @@ export default function MonthlySummary({
               Unduh CSV bulan terpilih
             </Button>
             {exportError ? (
-              <p className="text-sm leading-6 text-[var(--color-danger-strong)]" role="alert">
+              <p className="text-sm leading-6 text-[var(--color-expense-strong)]" role="alert">
                 {exportError}
               </p>
             ) : null}

@@ -8,7 +8,7 @@ import StatusBanner from "@/components/ui/StatusBanner";
 import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
 
 export default function UpdatePrompt() {
-  const updateAvailable = useServiceWorkerUpdate();
+  const { reloadApp, updateAvailable } = useServiceWorkerUpdate();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [portalTarget, setPortalTarget] = useState(null);
@@ -29,7 +29,7 @@ export default function UpdatePrompt() {
           <Button
             variant="secondary"
             size="compact"
-            onClick={() => window.location.reload()}
+             onClick={reloadApp}
           >
             Perbarui sekarang
           </Button>
@@ -47,7 +47,10 @@ export default function UpdatePrompt() {
   return (
     <div
       className="pointer-events-none fixed inset-x-4 z-[var(--z-toast)] mx-auto max-w-lg md:inset-x-auto md:right-6 md:mx-0 md:w-[min(28rem,calc(100vw-3rem))]"
-      style={{ bottom: "max(var(--space-md), env(safe-area-inset-bottom, 0px))" }}
+       style={{
+         bottom:
+           "calc(max(var(--space-md), env(safe-area-inset-bottom, 0px)) + 5rem)",
+       }}
     >
       {prompt}
     </div>
