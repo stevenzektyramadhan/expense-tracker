@@ -177,8 +177,8 @@ export async function GET(req) {
       { status: 200 }
     );
 
-  } catch (err) {
-    console.error("Summary GET error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  } catch (error) {
+    console.error("Summary GET error:", error);
+    return new Response(JSON.stringify({ error: "Terjadi kesalahan pada server." }), { status: 500 });
   }
 }
