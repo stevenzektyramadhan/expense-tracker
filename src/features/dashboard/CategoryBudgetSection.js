@@ -158,7 +158,7 @@ function BudgetRow({ budget, disabled, onDelete, onEdit }) {
       <div className="mt-2.5">
         <div className="h-1.5 w-full overflow-hidden rounded-[var(--radius-pill)] bg-[var(--color-surface-subtle)]">
           <div
-            className={`h-full rounded-[var(--radius-pill)] transition-all duration-300 ${progressFill}`}
+            className={`h-full rounded-[var(--radius-pill)] transition-[width,background-color] duration-300 motion-reduce:transition-none ${progressFill}`}
             style={{ width: `${spentPercent}%` }}
           />
         </div>
@@ -195,7 +195,12 @@ function BudgetRow({ budget, disabled, onDelete, onEdit }) {
   );
 }
 
-export default function CategoryBudgetSection({ currentPeriod, expenseCategories = [], userId }) {
+export default function CategoryBudgetSection({
+  currentPeriod,
+  expenseCategories = [],
+  expenseRevision = "",
+  userId,
+}) {
   const {
     budgets,
     deleteBudget,
@@ -204,7 +209,7 @@ export default function CategoryBudgetSection({ currentPeriod, expenseCategories
     loadBudgets,
     request,
     saveBudget,
-  } = useCategoryBudgets({ ...currentPeriod, userId });
+  } = useCategoryBudgets({ ...currentPeriod, expenseRevision, userId });
   const [formBudget, setFormBudget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteError, setDeleteError] = useState("");

@@ -1,5 +1,6 @@
 import prisma, { transactionOptions } from "@/lib/prisma";
 import {
+  findOrCreateAllowanceForPeriod,
   parseFinanceDate,
   parsePositiveAmount,
   validateTextLength,
@@ -25,21 +26,8 @@ const buildPeriodRange = (month, year) => ({
 });
 
 const resolveAllowanceForDate = async (tx, userId, { month, year }) => {
-  const allowance = await tx.allowances.findFirst({
-    where: { user_id: userId, month, year },
-  });
-  if (allowance) return allowance;
-
-  return tx.allowances.create({
-    data: {
-      user_id: userId,
-      month,
-      year,
-      amount: 0,
-      remaining: 0,
-      frequency: "monthly",
-    },
-  });
+  const { allowance } = await findOrCreateAllowanceForPeriod(tx, userId, { month, year });
+  return allowance;
 };
 
 const validateIncomeInput = (amount, source, note, date) => {

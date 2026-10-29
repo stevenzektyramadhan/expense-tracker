@@ -9,7 +9,7 @@ import FormField from "@/components/ui/FormField";
 import StatusBanner from "@/components/ui/StatusBanner";
 import AuthShell from "@/features/auth/AuthShell";
 import PasswordField from "@/features/auth/PasswordField";
-import { signUp } from "@/lib/supabaseClient";
+import { formatAuthErrorMessage, signUp } from "@/lib/supabaseClient";
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -50,7 +50,9 @@ export default function RegisterPage() {
       const { error } = await signUp(email, password, fullName);
 
       if (error) {
-        setFormError(error.message || "Akun belum dapat dibuat. Coba lagi.");
+        setFormError(
+          formatAuthErrorMessage(error, "Akun belum dapat dibuat. Coba lagi."),
+        );
         return;
       }
 

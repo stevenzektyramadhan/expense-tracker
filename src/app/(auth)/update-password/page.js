@@ -9,6 +9,7 @@ import StatusBanner from "@/components/ui/StatusBanner";
 import AuthShell from "@/features/auth/AuthShell";
 import PasswordField from "@/features/auth/PasswordField";
 import { supabase } from "@/lib/supabase";
+import { formatAuthErrorMessage } from "@/lib/supabaseClient";
 
 export default function UpdatePasswordPage() {
   const [newPassword, setNewPassword] = useState("");
@@ -70,12 +71,15 @@ export default function UpdatePasswordPage() {
 
     if (error) {
       setFormError(
-        error.message || "Kata sandi belum dapat diubah. Coba lagi.",
+        formatAuthErrorMessage(
+          error,
+          "Kata sandi belum dapat diubah. Coba lagi.",
+        ),
       );
       return;
     }
 
-    toast.success("Kata sandi berhasil diubah. Silakan masuk kembali.");
+    toast.success("Kata sandi disimpan. Silakan masuk kembali.");
     await supabase.auth.signOut();
     router.replace("/login");
   };

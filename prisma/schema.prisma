@@ -70,8 +70,8 @@ model allowances {
   expenses           expenses[]
   additional_incomes additional_incomes[]
 
-
-
+  @@unique([user_id, month, year])
+  @@index([user_id, year, month])
 }
 
 model additional_incomes {

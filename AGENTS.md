@@ -633,6 +633,7 @@ Common commands:
 npm install
 npx prisma generate
 npm run dev
+npm test
 npm run lint
 npm run build
 npm start
@@ -643,13 +644,10 @@ On Windows, the equivalent `npm.cmd` form may be used.
 Current repository validation baseline:
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```
-
-There is currently no guaranteed automated test script. Do not claim tests passed when no test suite exists.
-
-When a test framework is added, update this file and `package.json` with the authoritative commands.
 
 ## 19. Testing Direction
 

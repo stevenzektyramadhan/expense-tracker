@@ -1,5 +1,6 @@
 import prisma, { transactionOptions } from "@/lib/prisma";
 import {
+  decrementAllowanceRemainingAtomically,
   parseFinanceDate,
   parsePositiveAmount,
   planExpenseBalanceChange,
@@ -12,10 +13,20 @@ import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 const parseDateBoundary = (value, { inclusiveEnd = false } = {}) => {
   if (!value) return null;
 
-  const date = new Date(`${value}T00:00:00`);
+  const trimmed = String(value).trim();
+  const hasExplicitTimezone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed);
+  const date = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+      ? `${trimmed}T00:00:00+07:00`
+      : hasExplicitTimezone
+        ? trimmed
+        : `${trimmed}+07:00`,
+  );
   if (Number.isNaN(date.getTime())) return "invalid";
 
-  if (inclusiveEnd) date.setDate(date.getDate() + 1);
+  if (inclusiveEnd) {
+    return new Date(date.getTime() + 24 * 60 * 60 * 1000);
+  }
   return date;
 };
 
@@ -85,7 +96,14 @@ export async function POST(req) {
       if (!allowance) {
         throw { status: 400, message: "Allowance bulan ini belum dibuat" };
       }
-      if (Number(allowance.remaining) < input.amount) {
+
+      const deducted = await decrementAllowanceRemainingAtomically(
+        tx,
+        user.id,
+        allowance.id,
+        input.amount,
+      );
+      if (!deducted) {
         throw { status: 400, message: "Saldo tidak cukup! Hemat pangkal kaya." };
       }
 
@@ -99,14 +117,6 @@ export async function POST(req) {
           allowance_id: allowance.id,
           receipt_url: receipt?.secureUrl ?? null,
           receipt_public_id: receipt?.publicId ?? null,
-        },
-      });
-
-      await tx.allowances.update({
-        where: { id: allowance.id },
-        data: {
-          remaining: { decrement: input.amount },
-          updated_at: new Date(),
         },
       });
 
@@ -203,37 +213,34 @@ export async function PUT(req) {
       });
 
       if (balanceChange.isSamePeriod) {
-        if (balanceChange.difference > 0 && Number(targetAllowance.remaining) < balanceChange.difference) {
+        const deducted = await decrementAllowanceRemainingAtomically(
+          tx,
+          user.id,
+          targetAllowance.id,
+          balanceChange.difference,
+        );
+        if (!deducted) {
           throw { status: 400, message: "Saldo tidak cukup! Hemat pangkal kaya." };
         }
-
-        await tx.allowances.update({
-          where: { id: targetAllowance.id },
-          data: {
-            remaining: { decrement: balanceChange.difference },
-            updated_at: new Date(),
-          },
-        });
       } else {
-        if (Number(targetAllowance.remaining) < input.amount) {
+        const deducted = await decrementAllowanceRemainingAtomically(
+          tx,
+          user.id,
+          targetAllowance.id,
+          input.amount,
+        );
+        if (!deducted) {
           throw { status: 400, message: "Saldo tidak cukup! Hemat pangkal kaya." };
         }
         if (currentAllowance) {
-          await tx.allowances.update({
-            where: { id: currentAllowance.id },
+          await tx.allowances.updateMany({
+            where: { id: currentAllowance.id, user_id: user.id },
             data: {
               remaining: { increment: Number(existingExpense.amount) },
               updated_at: new Date(),
             },
           });
         }
-        await tx.allowances.update({
-          where: { id: targetAllowance.id },
-          data: {
-            remaining: { decrement: input.amount },
-            updated_at: new Date(),
-          },
-        });
       }
 
       return tx.expenses.update({

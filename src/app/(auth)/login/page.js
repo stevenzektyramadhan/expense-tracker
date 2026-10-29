@@ -9,7 +9,7 @@ import FormField from "@/components/ui/FormField";
 import StatusBanner from "@/components/ui/StatusBanner";
 import AuthShell from "@/features/auth/AuthShell";
 import PasswordField from "@/features/auth/PasswordField";
-import { signIn } from "@/lib/supabaseClient";
+import { formatAuthErrorMessage, signIn } from "@/lib/supabaseClient";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -27,7 +27,12 @@ export default function LoginPage() {
       const { error } = await signIn(email, password);
 
       if (error) {
-        setFormError(error.message || "Akun belum dapat diakses. Coba lagi.");
+        setFormError(
+          formatAuthErrorMessage(
+            error,
+            "Akun belum dapat diakses. Coba lagi.",
+          ),
+        );
         return;
       }
 

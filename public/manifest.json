@@ -4,8 +4,8 @@
   "description": "Aplikasi pencatat keuangan harian khas Bangka Belitung",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#f6f4ee",
+  "theme_color": "#1f5f5b",
   "orientation": "portrait",
   "icons": [
     {

@@ -66,3 +66,54 @@ export const getCurrentUser = async () => {
   } = await supabase.auth.getUser();
   return user;
 };
+
+export const formatAuthErrorMessage = (error, fallbackMessage) => {
+  const raw = String(error?.message || "").toLowerCase();
+  if (!raw) return fallbackMessage;
+
+  if (
+    raw.includes("invalid login credentials") ||
+    raw.includes("invalid_credentials")
+  ) {
+    return "Email atau kata sandi belum sesuai. Periksa kembali lalu coba lagi.";
+  }
+
+  if (raw.includes("email not confirmed")) {
+    return "Alamat email belum dikonfirmasi. Periksa kotak masuk atau folder spam Anda.";
+  }
+
+  if (
+    raw.includes("user already registered") ||
+    raw.includes("already been registered")
+  ) {
+    return "Alamat email ini sudah terdaftar. Silakan masuk atau gunakan pemulihan kata sandi.";
+  }
+
+  if (
+    raw.includes("password should be at least") ||
+    raw.includes("weak_password")
+  ) {
+    return "Kata sandi terlalu pendek. Gunakan minimal 6 karakter.";
+  }
+
+  if (
+    raw.includes("same_password") ||
+    raw.includes("different from the old password")
+  ) {
+    return "Kata sandi baru harus berbeda dari kata sandi sebelumnya.";
+  }
+
+  if (
+    raw.includes("rate limit") ||
+    raw.includes("too many requests") ||
+    raw.includes("for security purposes")
+  ) {
+    return "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.";
+  }
+
+  if (raw.includes("network") || raw.includes("failed to fetch")) {
+    return "Koneksi sedang terputus. Periksa jaringan lalu coba lagi.";
+  }
+
+  return fallbackMessage;
+};

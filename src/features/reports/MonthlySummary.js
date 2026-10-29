@@ -220,18 +220,25 @@ export default function MonthlySummary({
                   id="ai-advice-heading"
                   className="min-w-0 font-[family-name:var(--font-display-family)] text-lg font-bold [overflow-wrap:anywhere]"
                 >
-                  Analisis & Rekomendasi AI
+                  Analisis & Rekomendasi Pengeluaran
                 </h2>
                 {advice ? (
-                  <span
-                    className={`rounded-[var(--radius-pill)] border px-2.5 py-0.5 text-xs font-semibold ${statusMeta.className}`}
-                  >
-                    {statusMeta.label}
-                  </span>
+                  <>
+                    <span
+                      className={`rounded-[var(--radius-pill)] border px-2.5 py-0.5 text-xs font-semibold ${statusMeta.className}`}
+                    >
+                      {statusMeta.label}
+                    </span>
+                    <span className="rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-text-muted)]">
+                      {advice.source === "gemini"
+                        ? "Ringkasan AI (Gemini)"
+                        : "Kalkulasi aturan lokal"}
+                    </span>
+                  </>
                 ) : null}
               </div>
               <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
-                Evaluasi laju pengeluaran, anggaran kategori, dan saran penghematan untuk {selectedLabel}.
+                Evaluasi laju pengeluaran, anggaran kategori, dan saran penghematan untuk {selectedLabel}. Saat diminta, hanya ringkasan angka agregat per kategori yang dianalisis tanpa catatan pribadi atau struk.
               </p>
             </div>
           </div>
@@ -245,7 +252,7 @@ export default function MonthlySummary({
               loadingLabel="Menganalisis…"
             >
               <Sparkles className="size-4" aria-hidden="true" />
-              {advice ? "Perbarui analisis" : "Minta analisis AI"}
+              {advice ? "Perbarui analisis" : "Minta analisis"}
             </Button>
           ) : null}
         </div>
@@ -264,22 +271,22 @@ export default function MonthlySummary({
             <p className="text-sm font-medium leading-6 text-[var(--color-text)]">
               {advice.summary}
             </p>
-            <ul className="grid gap-2 text-sm leading-6 text-[var(--color-text-muted)]">
+            <ol className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)] text-sm leading-6 text-[var(--color-text)]">
               {(advice.recommendations || []).map((tip, idx) => (
                 <li
                   key={idx}
-                  className="flex items-start gap-2.5 rounded-[var(--radius-control)] bg-[var(--color-surface-subtle)] px-3 py-2 text-[var(--color-text)]"
+                  className="flex items-start gap-2.5 py-2.5"
                 >
-                  <span className="mt-0.5 font-bold text-[var(--color-primary-strong)]">
+                  <span className="mt-0.5 font-bold tabular-nums text-[var(--color-primary-strong)]">
                     {idx + 1}.
                   </span>
                   <span className="min-w-0 flex-1">{tip}</span>
                 </li>
               ))}
-            </ul>
+            </ol>
 
             {advice.suggestedBudgetAction && onApplyBudgetAction ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <div className="min-w-0 text-xs text-[var(--color-text-muted)]">
                   <span className="font-semibold text-[var(--color-text)]">
                     Aksi cepat:
@@ -311,7 +318,7 @@ export default function MonthlySummary({
                     Terapkan budget
                   </Button>
                   <Link
-                    href="/#category-budget-heading"
+                    href="/#category-budgets-title"
                     className="ui-button"
                     data-variant="quiet"
                     data-size="compact"

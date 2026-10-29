@@ -50,7 +50,7 @@ export default function AddIncomePage() {
         });
       }
 
-      toast.success("Pendapatan tambahan berhasil disimpan.");
+      toast.success("Pendapatan tambahan disimpan.");
       router.push("/income");
     } finally {
       setIsSubmitting(false);

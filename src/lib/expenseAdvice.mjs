@@ -1,5 +1,5 @@
 const MONTH_KEY_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
-const VALID_STATUSES = new Set(["aman", "waspada", "kritis"]);
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 const idrFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -8,6 +8,37 @@ const idrFormatter = new Intl.NumberFormat("id-ID", {
 });
 
 const formatIdr = (value) => idrFormatter.format(Math.round(Number(value) || 0));
+
+const sanitizeLabelForPrompt = (value) =>
+  String(value ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[<>{}[\]`"]/g, "")
+    .trim()
+    .slice(0, 60);
+
+export const buildSafeAdvicePromptPayload = (snapshot) => ({
+  period: snapshot.period,
+  status: snapshot.status,
+  totalSpent: snapshot.totalSpent,
+  totalTransactions: snapshot.totalTransactions,
+  dailyBurnRate: snapshot.dailyBurnRate,
+  allowanceAmount: snapshot.allowanceAmount,
+  allowanceRemaining: snapshot.allowanceRemaining,
+  safeDailyAllowance: snapshot.safeDailyAllowance,
+  projectedRunwayDays: snapshot.projectedRunwayDays,
+  prevMonthTotal: snapshot.prevMonthTotal,
+  monthOverMonthPercent: snapshot.monthOverMonthPercent,
+  smallExpenseCount: snapshot.smallExpenseCount,
+  smallExpenseTotal: snapshot.smallExpenseTotal,
+  categories: (snapshot.categories || []).slice(0, 8).map((item) => ({
+    category: sanitizeLabelForPrompt(item.category),
+    amount: item.amount,
+    count: item.count,
+    sharePercent: item.sharePercent,
+    budgetAmount: item.budgetAmount,
+    budgetPercent: item.budgetPercent,
+  })),
+});
 
 export const parseAdviceMonthKey = (monthKey) => {
   const match = MONTH_KEY_PATTERN.exec(String(monthKey ?? "").trim());
@@ -32,11 +63,12 @@ export const computeFinancialSnapshot = ({
   prevMonthTotal = 0,
   smallExpenseSummary = { count: 0, total: 0 },
 }) => {
+  const wibNow = new Date(now.getTime() + WIB_OFFSET_MS);
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const isCurrentMonth =
-    now.getUTCFullYear() === year && now.getUTCMonth() + 1 === month;
+    wibNow.getUTCFullYear() === year && wibNow.getUTCMonth() + 1 === month;
   const elapsedDays = isCurrentMonth
-    ? Math.max(1, Math.min(daysInMonth, now.getUTCDate()))
+    ? Math.max(1, Math.min(daysInMonth, wibNow.getUTCDate()))
     : daysInMonth;
   const remainingDays = isCurrentMonth ? Math.max(0, daysInMonth - elapsedDays) : 0;
 
@@ -218,9 +250,8 @@ export const normalizeGeminiAdvice = (rawText, fallbackAdvice) => {
       .replace(/\s*```$/, "")
       .trim();
     const parsed = JSON.parse(cleaned);
-    const status = VALID_STATUSES.has(parsed?.status)
-      ? parsed.status
-      : fallbackAdvice.status;
+    // Keep server-computed deterministic status authoritative so LLM output cannot downgrade risk state
+    const status = fallbackAdvice.status;
     const summary =
       typeof parsed?.summary === "string" && parsed.summary.trim().length > 10
         ? parsed.summary.trim().slice(0, 360)

@@ -9,6 +9,7 @@ import FormField from "@/components/ui/FormField";
 import StatusBanner from "@/components/ui/StatusBanner";
 import AuthShell from "@/features/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
+import { formatAuthErrorMessage } from "@/lib/supabaseClient";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -38,7 +39,10 @@ export default function ForgotPasswordPage() {
 
     if (error) {
       setFormError(
-        error.message || "Petunjuk reset belum dapat dikirim. Coba lagi.",
+        formatAuthErrorMessage(
+          error,
+          "Petunjuk reset belum dapat dikirim. Coba lagi.",
+        ),
       );
     } else {
       setEmailSent(true);

@@ -2,7 +2,7 @@ export const getBudgetStatusLabel = (status) => {
   if (status === "warning") return "Perlu diperhatikan";
   if (status === "limit_reached") return "Batas tercapai";
   if (status === "exceeded") return "Melewati batas";
-  return "On track";
+  return "Aman";
 };
 
 export const getBudgetStatusTone = (status) => {

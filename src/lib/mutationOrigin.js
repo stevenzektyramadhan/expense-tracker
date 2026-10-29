@@ -11,5 +11,5 @@ export function requireAllowedMutationOrigin(request, authMethod) {
     return null;
   }
 
-  return new Response(JSON.stringify({ error: "Forbidden origin" }), { status: 403 });
+  return Response.json({ error: "Forbidden origin" }, { status: 403 });
 }

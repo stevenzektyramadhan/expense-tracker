@@ -2,6 +2,7 @@ const MIN_YEAR = 1970;
 const MAX_YEAR = 3000;
 const MAX_CATEGORY_LENGTH = 100;
 const MAX_POSTGRES_INTEGER = 2_147_483_647;
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 const invalid = (field, message) => ({ ok: false, error: `${field} ${message}` });
 
@@ -16,12 +17,13 @@ const parseInteger = (value, field, minimum, maximum) => {
 const parseCategory = (value) => {
   if (typeof value !== "string") return invalid("category", "must be a string");
 
-  if (!value.trim()) return invalid("category", "must not be empty");
-  if (value.length > MAX_CATEGORY_LENGTH) {
+  const trimmed = value.trim();
+  if (!trimmed) return invalid("category", "must not be empty");
+  if (trimmed.length > MAX_CATEGORY_LENGTH) {
     return invalid("category", `must be at most ${MAX_CATEGORY_LENGTH} characters`);
   }
 
-  return { ok: true, value };
+  return { ok: true, value: trimmed };
 };
 
 export const parseCategoryBudgetPeriod = (params) => {
@@ -62,8 +64,8 @@ export const parseCategoryBudgetInput = ({ month, year, category, amount } = {})
 };
 
 export const buildCategoryBudgetPeriodRange = (year, month) => ({
-  start: new Date(Date.UTC(year, month - 1, 1)),
-  end: new Date(Date.UTC(year, month, 1)),
+  start: new Date(Date.UTC(year, month - 1, 1) - WIB_OFFSET_MS),
+  end: new Date(Date.UTC(year, month, 1) - WIB_OFFSET_MS),
 });
 
 export const calculateCategoryBudgetStatus = (amount, spent) => {

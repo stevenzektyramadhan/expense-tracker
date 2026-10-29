@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 export function useServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const registrationRef = useRef(null);
+  const userAcceptedUpdateRef = useRef(false);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return undefined;
@@ -14,9 +15,9 @@ export function useServiceWorkerUpdate() {
     let reloadRequested = false;
 
     const handleControllerChange = () => {
-      if (reloadRequested) return;
+      if (!userAcceptedUpdateRef.current || reloadRequested) return;
       reloadRequested = true;
-      window.location.reload(); // reload otomatis kalau SW baru aktif
+      window.location.reload();
     };
 
     const handleWorkerStateChange = () => {
@@ -69,7 +70,12 @@ export function useServiceWorkerUpdate() {
   }, []);
 
   const reloadApp = () => {
-    registrationRef.current?.waiting?.postMessage({ type: "SKIP_WAITING" });
+    userAcceptedUpdateRef.current = true;
+    const waitingWorker = registrationRef.current?.waiting;
+    if (waitingWorker) {
+      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+      return;
+    }
     window.location.reload();
   };
 

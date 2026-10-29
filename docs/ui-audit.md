@@ -344,3 +344,24 @@ The UI migration must not change:
 ## Audit limitations
 
 This was a code-level Hallmark audit. No authenticated test account was supplied, so no live finance data, screenshot capture, keyboard walkthrough, screen-reader pass, or runtime viewport inspection was performed. The migration plan therefore requires explicit manual checks at 320, 360, 375, 390, 414, 768, 1024, and 1440 CSS pixels before any replacement is considered verified.
+
+---
+
+## Follow-up Audit & Resolution Status (October 2026)
+
+Since the initial July 2026 baseline audit above, the responsive migration and follow-up security/UI hardening have been completed:
+
+1. **Unified Responsive Architecture (`src/features/`, `src/components/navigation/AppShell.js`)**:
+   - Dashboard (`DashboardPage.js`), Add Expense (`ExpenseForm.js` + `useExpenseForm.js`), Income (`IncomePage.js` + `IncomeForm.js`), and Monthly Summary (`MonthlySummary.js`) now render from a single responsive component tree using Calm Ledger design tokens (`#f6f4ee` paper canvas, `#1f5f5b` teal brand accent, Geist + Plus Jakarta Sans with `tabular-nums`).
+   - Legacy `src/components/mobile/*` files are unreferenced by active routes and marked `@deprecated` pending explicit deletion approval.
+2. **Finance Concurrency & Period Integrity (`src/lib/financeValidation.mjs`, `src/lib/categoryBudget.mjs`, `src/lib/expenseAdvice.mjs`, `prisma/schema.prisma`)**:
+   - Expense and income balance deductions use atomic conditional `updateMany` (`remaining >= amount`) inside database transactions to prevent concurrent TOCTOU overspending.
+   - Allowance creation is guarded by `@@unique([user_id, month, year])` and `P2002` conflict recovery.
+   - Finance date parsing, category budget boundaries, and monthly advice snapshots all align on `Asia/Jakarta` (`UTC+7`, WIB) boundaries.
+3. **AI Advice Hardening & UI Polish (`src/app/api/summary/advice/route.js`, `src/features/reports/MonthlySummary.js`)**:
+   - Gemini API calls pass `GEMINI_API_KEY` via `x-goog-api-key` header, enforce a per-user snapshot cache/cooldown, sanitize category names inside `<data_agregat>` delimiters, and keep deterministic rule-based `status` (`aman` / `waspada` / `kritis`) authoritative.
+   - `MonthlySummary.js` surfaces the advice source (`Ringkasan AI (Gemini)` vs `Kalkulasi aturan lokal`), displays a privacy notice, flattens nested card-in-card lists, and links directly to `/#category-budgets-title`.
+4. **PWA, Motion & Indonesian Copy (`next.config.mjs`, `src/hooks/useServiceWorkerUpdate.js`, `public/manifest.json`, `src/lib/supabaseClient.js`)**:
+   - Service worker updates wait for explicit user confirmation (`skipWaiting: false`) before reloading.
+   - Manifest and viewport theme colors match Calm Ledger (`#f6f4ee` / `#1f5f5b`).
+   - Decorative `backdrop-blur` and `transition-all` have been replaced with solid surfaces and `motion-reduce:transition-none`, and Supabase auth errors map to calm Indonesian messages.

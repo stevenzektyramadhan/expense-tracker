@@ -85,7 +85,7 @@ export default function SpendingInsights({ insights }) {
               />
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-[var(--radius-pill)] bg-[var(--color-surface-subtle)]">
                 <div
-                  className="h-full rounded-[var(--radius-pill)] bg-[var(--color-primary)] transition-all duration-300"
+                  className="h-full rounded-[var(--radius-pill)] bg-[var(--color-primary)] transition-[width] duration-300 motion-reduce:transition-none"
                   style={{ width: `${Math.min(Math.round(largestCategory.share * 100), 100)}%` }}
                 />
               </div>

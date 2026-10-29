@@ -3,7 +3,7 @@
 /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
  * Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: Calm Ledger · designed-as-app
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PlusCircle, UserRound } from "lucide-react";
 
@@ -162,6 +162,16 @@ export default function DashboardPage({
     () => (Array.isArray(expenses) ? expenses : []),
     [expenses],
   );
+  const expenseRevision = useMemo(
+    () =>
+      safeExpenses
+        .map(
+          (expense) =>
+            `${expense.id}:${expense.amount}:${expense.category}:${expense.date}`,
+        )
+        .join("|"),
+    [safeExpenses],
+  );
   const categories = useMemo(() => {
     return Array.from(
       new Set([
@@ -170,6 +180,17 @@ export default function DashboardPage({
       ]),
     );
   }, [safeExpenses]);
+
+  useEffect(() => {
+    if (isInitialLoading || typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!hash || hash.length <= 1) return;
+    const targetId = decodeURIComponent(hash.slice(1));
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      targetElement.scrollIntoView({ block: "start" });
+    }
+  }, [isInitialLoading]);
 
   const filtersAreActive =
     filters.period === "all" ||
@@ -362,6 +383,7 @@ export default function DashboardPage({
           <CategoryBudgetSection
             currentPeriod={currentAllowancePeriod}
             expenseCategories={safeExpenses.map((expense) => expense.category).filter(Boolean)}
+            expenseRevision={expenseRevision}
             userId={userId}
           />
 

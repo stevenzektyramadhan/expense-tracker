@@ -102,7 +102,7 @@ export default function AppShell({ children, isLoading = false, user }) {
         Lewati ke konten utama
       </a>
 
-      <div className="sticky top-0 z-[var(--app-navigation-layer)] border-b border-[var(--color-border)] bg-[var(--color-surface-raised)]/95 backdrop-blur-lg">
+      <div className="sticky top-0 z-[var(--app-navigation-layer)] border-b border-[var(--color-border)] bg-[var(--color-surface-raised)]">
         <div
           className="mx-auto flex min-h-[var(--app-header-height)] w-full max-w-7xl items-stretch gap-3 px-4 sm:px-6 lg:px-8"
           style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}

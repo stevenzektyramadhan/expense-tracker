@@ -1,5 +1,6 @@
 import prisma, { transactionOptions } from "@/lib/prisma";
 import {
+  findOrCreateAllowanceForPeriod,
   parseFinanceDate,
   parsePositiveAmount,
   validateTextLength,
@@ -8,21 +9,8 @@ import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
 const resolveAllowanceForDate = async (tx, userId, { month, year }) => {
-  const allowance = await tx.allowances.findFirst({
-    where: { user_id: userId, month, year },
-  });
-  if (allowance) return allowance;
-
-  return tx.allowances.create({
-    data: {
-      user_id: userId,
-      month,
-      year,
-      amount: 0,
-      remaining: 0,
-      frequency: "monthly",
-    },
-  });
+  const { allowance } = await findOrCreateAllowanceForPeriod(tx, userId, { month, year });
+  return allowance;
 };
 
 const applyAllowanceDelta = async (tx, userId, allowanceId, delta) => {
@@ -33,12 +21,38 @@ const applyAllowanceDelta = async (tx, userId, allowanceId, delta) => {
     return { status: 404, payload: { error: "Allowance not found" } };
   }
 
-  const nextAmount = Number(allowance.amount) + delta;
-  const nextRemaining = Number(allowance.remaining) + delta;
-  if (nextAmount < 0 || nextRemaining < 0) {
+  if (delta < 0) {
+    const required = Math.abs(delta);
+    const updated = await tx.allowances.updateMany({
+      where: {
+        id: allowance.id,
+        user_id: userId,
+        amount: { gte: required },
+        remaining: { gte: required },
+      },
+      data: {
+        amount: { decrement: required },
+        remaining: { decrement: required },
+        updated_at: new Date(),
+      },
+    });
+    if (updated.count !== 1) {
+      return {
+        status: 400,
+        payload: { error: "Pendapatan tidak dapat diubah karena saldo sudah terpakai." },
+      };
+    }
+
+    const refreshed = await tx.allowances.findFirst({
+      where: { id: allowance.id, user_id: userId },
+    });
     return {
-      status: 400,
-      payload: { error: "Pendapatan tidak dapat diubah karena saldo sudah terpakai." },
+      status: 200,
+      payload: {
+        ...refreshed,
+        amount: refreshed.amount.toString(),
+        remaining: refreshed.remaining.toString(),
+      },
     };
   }
 

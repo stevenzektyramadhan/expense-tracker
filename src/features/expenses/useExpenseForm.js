@@ -544,7 +544,7 @@ export default function useExpenseForm({
 
       invalidateUploadedReceiptCache();
       resetForm();
-      toast.success("Pengeluaran berhasil disimpan!");
+      toast.success("Pengeluaran disimpan.");
       if (onSuccess) {
         onSuccess();
       } else {

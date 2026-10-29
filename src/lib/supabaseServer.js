@@ -74,8 +74,6 @@ export async function requireAuthenticatedUser(request) {
   return {
     user: null,
     authMethod: null,
-    errorResponse: new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-    }),
+    errorResponse: Response.json({ error: "Unauthorized" }, { status: 401 }),
   };
 }

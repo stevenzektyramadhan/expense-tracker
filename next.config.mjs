@@ -43,7 +43,7 @@ const securityHeaders = [
 const withPWA = withPWAInit({
   dest: "public", // Service worker & manifest akan di-generate ke /public
   register: false, // Registrasi service worker ditangani AppClientProviders
-  skipWaiting: true, // Service worker baru langsung aktif tanpa tunggu close browser
+  skipWaiting: false, // Aktivasi SW baru dikontrol eksplisit oleh UpdatePrompt
   disable: process.env.NODE_ENV === "development", // Nonaktif saat dev mode
 });
 

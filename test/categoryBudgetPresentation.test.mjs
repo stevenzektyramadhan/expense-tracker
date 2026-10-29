@@ -9,7 +9,7 @@ import {
 } from "../src/features/dashboard/categoryBudgetPresentation.js";
 
 test("budget status labels keep text meaning alongside semantic tones", () => {
-  assert.equal(getBudgetStatusLabel("on_track"), "On track");
+  assert.equal(getBudgetStatusLabel("on_track"), "Aman");
   assert.equal(getBudgetStatusLabel("warning"), "Perlu diperhatikan");
   assert.equal(getBudgetStatusLabel("limit_reached"), "Batas tercapai");
   assert.equal(getBudgetStatusLabel("exceeded"), "Melewati batas");

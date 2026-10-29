@@ -2,17 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildCategoryBudgetPeriodRange,
   calculateCategoryBudgetStatus,
   parseCategoryBudgetInput,
   parseCategoryBudgetPeriod,
 } from "../src/lib/categoryBudget.mjs";
 
-test("Given valid budget boundary values, When parsing a budget input, Then exact category identity is retained", () => {
+test("Given valid budget boundary values, When parsing a budget input, Then category whitespace is normalized to match expense storage", () => {
   assert.deepEqual(
     parseCategoryBudgetInput({ month: 10, year: 2026, category: "  Makan  ", amount: 250000 }),
     {
       ok: true,
-      value: { month: 10, year: 2026, category: "  Makan  ", amount: 250000 },
+      value: { month: 10, year: 2026, category: "Makan", amount: 250000 },
     },
   );
 });
@@ -61,4 +62,10 @@ test("Given category spending below, at, and above status boundaries, When calcu
     remaining: -25,
     status: "exceeded",
   });
+});
+
+test("Given a WIB month and year, When building category budget period range, Then boundaries align with 00:00:00+07:00", () => {
+  const range = buildCategoryBudgetPeriodRange(2026, 11);
+  assert.equal(range.start.toISOString(), "2026-10-31T17:00:00.000Z");
+  assert.equal(range.end.toISOString(), "2026-11-30T17:00:00.000Z");
 });

@@ -10,7 +10,12 @@ const createRequest = (status = "idle", error = null) => ({ status, error });
 const getErrorMessage = (error, fallback) =>
   error instanceof Error && error.message ? error.message : fallback;
 
-export default function useCategoryBudgets({ month, year, userId }) {
+export default function useCategoryBudgets({
+  month,
+  year,
+  userId,
+  expenseRevision = "",
+}) {
   const [budgetResource, setBudgetResource] = useState({
     userId: null,
     data: null,
@@ -19,62 +24,69 @@ export default function useCategoryBudgets({ month, year, userId }) {
   const [mutation, setMutation] = useState(createRequest());
   const requestRef = useRef({ controller: null, sequence: 0 });
   const mutationInFlightRef = useRef(false);
+  const lastRevisionRef = useRef(expenseRevision);
 
-  const loadBudgets = useCallback(async () => {
-    if (!userId) return;
+  const loadBudgets = useCallback(
+    async ({ preserveExisting = false } = {}) => {
+      if (!userId) return;
 
-    requestRef.current.controller?.abort();
-    const controller = new AbortController();
-    const sequence = requestRef.current.sequence + 1;
-    requestRef.current = { controller, sequence };
-    setRequest(createRequest("loading"));
-
-    try {
-      const response = await authenticatedFetch(
-        `/api/budgets?month=${month}&year=${year}`,
-        { signal: controller.signal },
-      );
-      const payload = await response.json().catch(() => null);
-
-      if (
-        controller.signal.aborted ||
-        requestRef.current.sequence !== sequence
-      ) {
-        return;
+      requestRef.current.controller?.abort();
+      const controller = new AbortController();
+      const sequence = requestRef.current.sequence + 1;
+      requestRef.current = { controller, sequence };
+      if (!preserveExisting) {
+        setRequest(createRequest("loading"));
       }
 
-      if (!response.ok) {
-        throw new Error(payload?.error || "Gagal memuat anggaran kategori.");
-      }
+      try {
+        const response = await authenticatedFetch(
+          `/api/budgets?month=${month}&year=${year}`,
+          { signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => null);
 
-      if (!Array.isArray(payload?.data)) {
-        throw new Error("Respons anggaran kategori tidak valid.");
-      }
+        if (
+          controller.signal.aborted ||
+          requestRef.current.sequence !== sequence
+        ) {
+          return;
+        }
 
-      setBudgetResource({ userId, data: payload.data });
-      setRequest(createRequest("success"));
-    } catch (error) {
-      if (
-        controller.signal.aborted ||
-        requestRef.current.sequence !== sequence ||
-        error?.name === "AbortError"
-      ) {
-        return;
-      }
+        if (!response.ok) {
+          throw new Error(payload?.error || "Gagal memuat anggaran kategori.");
+        }
 
-      console.error("Failed to load category budgets", error);
-      setRequest(
-        createRequest(
-          "error",
-          getErrorMessage(error, "Gagal memuat anggaran kategori."),
-        ),
-      );
-    }
-  }, [month, userId, year]);
+        if (!Array.isArray(payload?.data)) {
+          throw new Error("Respons anggaran kategori tidak valid.");
+        }
+
+        setBudgetResource({ userId, data: payload.data });
+        setRequest(createRequest("success"));
+      } catch (error) {
+        if (
+          controller.signal.aborted ||
+          requestRef.current.sequence !== sequence ||
+          error?.name === "AbortError"
+        ) {
+          return;
+        }
+
+        console.error("Failed to load category budgets", error);
+        setRequest(
+          createRequest(
+            "error",
+            getErrorMessage(error, "Gagal memuat anggaran kategori."),
+          ),
+        );
+      }
+    },
+    [month, userId, year],
+  );
 
   useEffect(() => {
     setBudgetResource({ userId, data: null });
     setMutation(createRequest());
+    lastRevisionRef.current = expenseRevision;
 
     if (!userId) {
       requestRef.current.controller?.abort();
@@ -84,7 +96,15 @@ export default function useCategoryBudgets({ month, year, userId }) {
 
     loadBudgets();
     return () => requestRef.current.controller?.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadBudgets, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (lastRevisionRef.current === expenseRevision) return;
+    lastRevisionRef.current = expenseRevision;
+    loadBudgets({ preserveExisting: true });
+  }, [expenseRevision, loadBudgets, userId]);
 
   const saveBudget = useCallback(
     async ({ category, amount }) => {

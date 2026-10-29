@@ -1,5 +1,8 @@
 import prisma, { transactionOptions } from "@/lib/prisma";
-import { parsePositiveAmount } from "@/lib/financeValidation.mjs";
+import {
+  findOrCreateAllowanceForPeriod,
+  parsePositiveAmount,
+} from "@/lib/financeValidation.mjs";
 import { requireAllowedMutationOrigin } from "@/lib/mutationOrigin";
 import { requireAuthenticatedUser } from "@/lib/supabaseServer";
 
@@ -31,20 +34,13 @@ export async function POST(req) {
 
     const { month, year } = getCurrentPeriod();
     const allowance = await prisma.$transaction(async (tx) => {
-      const existing = await tx.allowances.findFirst({
-        where: { user_id: user.id, month, year },
+      const { allowance: resolved } = await findOrCreateAllowanceForPeriod(tx, user.id, {
+        month,
+        year,
+        amount: parsedAmount.amount,
+        remaining: parsedAmount.amount,
       });
-      if (existing) return existing;
-
-      return tx.allowances.create({
-        data: {
-          user_id: user.id,
-          month,
-          year,
-          amount: parsedAmount.amount,
-          remaining: parsedAmount.amount,
-        },
-      });
+      return resolved;
     }, transactionOptions);
 
     return new Response(JSON.stringify(serializeAllowance(allowance)), { status: 200 });
@@ -89,21 +85,15 @@ export async function PUT(req) {
 
     const { month, year } = getCurrentPeriod();
     const result = await prisma.$transaction(async (tx) => {
-      const existing = await tx.allowances.findFirst({
-        where: { user_id: user.id, month, year },
+      const { allowance: existing, created } = await findOrCreateAllowanceForPeriod(tx, user.id, {
+        month,
+        year,
+        amount: parsedAmount.amount,
+        remaining: parsedAmount.amount,
+        frequency,
       });
-      if (!existing) {
-        const allowance = await tx.allowances.create({
-          data: {
-            user_id: user.id,
-            month,
-            year,
-            amount: parsedAmount.amount,
-            remaining: parsedAmount.amount,
-            frequency,
-          },
-        });
-        return { status: 200, payload: serializeAllowance(allowance) };
+      if (created) {
+        return { status: 200, payload: serializeAllowance(existing) };
       }
 
       const [incomes, expenses] = await Promise.all([
