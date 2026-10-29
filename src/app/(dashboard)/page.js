@@ -8,7 +8,6 @@ import useDashboardData from "@/features/dashboard/useDashboardData";
 import { useAuth } from "@/hooks/useAuth";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { supabase } from "@/lib/supabaseClient";
-import MobileExpenseDetailSheet from "@/components/mobile/MobileExpenseDetailSheet";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import AllowanceModal from "./components/AllowanceModal";
 import EditExpenseModal from "./components/EditExpenseModal";
@@ -25,29 +24,13 @@ const DETAIL_LABELS = {
   noDescription: "Tanpa deskripsi",
   noReceipt: "Tidak ada foto struk",
   zoom: "Perbesar struk",
-  edit: "Edit",
+  edit: "Ubah",
   delete: "Hapus",
   close: "Tutup",
 };
 
 function ResponsiveExpenseDetailOverlay(props) {
-  const [useDesktopGeometry, setUseDesktopGeometry] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 768px)");
-    const updateGeometry = () => setUseDesktopGeometry(mediaQuery.matches);
-
-    updateGeometry();
-    mediaQuery.addEventListener("change", updateGeometry);
-
-    return () => mediaQuery.removeEventListener("change", updateGeometry);
-  }, []);
-
-  const DetailOverlay = useDesktopGeometry
-    ? ExpenseDetailModal
-    : MobileExpenseDetailSheet;
-
-  return <DetailOverlay {...props} />;
+  return <ExpenseDetailModal {...props} />;
 }
 
 export default function DashboardRoute() {

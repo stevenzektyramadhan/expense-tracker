@@ -23,20 +23,21 @@ export default function ExpenseDetailModal({
       open
       onClose={onClose}
       size="lg"
+      variant="responsive-sheet"
       title={copy.title}
       closeLabel={copy.close}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} className="w-full md:w-auto">
             {copy.close}
           </Button>
           {onEdit ? (
-            <Button variant="secondary" onClick={() => onEdit(expense)}>
+              <Button variant="secondary" onClick={() => onEdit(expense)} className="w-full md:w-auto">
               {copy.edit}
             </Button>
           ) : null}
           {onDelete ? (
-            <Button variant="destructive" onClick={() => onDelete(expense.id)}>
+              <Button variant="destructive" onClick={() => onDelete(expense.id)} className="w-full md:w-auto">
               {copy.delete}
             </Button>
           ) : null}
@@ -47,4 +48,3 @@ export default function ExpenseDetailModal({
     </Dialog>
   );
 }
-

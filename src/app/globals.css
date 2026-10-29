@@ -721,6 +721,46 @@ textarea.ui-form-control {
   );
 }
 
+.ui-dialog[data-variant="responsive-sheet"] .ui-dialog__footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ui-dialog[data-variant="responsive-sheet"] .ui-dialog__footer .ui-button[data-variant="destructive"] {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 768px) {
+  .ui-dialog[data-variant="responsive-sheet"] .ui-dialog__footer {
+    display: flex;
+  }
+
+  .ui-dialog[data-variant="responsive-sheet"] .ui-dialog__footer .ui-button[data-variant="destructive"] {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .ui-dialog[data-variant="responsive-sheet"] {
+    inset: auto 0 0;
+    width: 100%;
+    max-width: 32rem;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - var(--space-sm));
+    margin: 0 auto;
+  }
+
+  .ui-dialog[data-variant="responsive-sheet"] .ui-dialog__surface {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - var(--space-sm));
+    border-block-end: 0;
+    border-radius: var(--radius-prominent) var(--radius-prominent) 0 0;
+    animation-name: ui-sheet-enter;
+  }
+
+  .ui-dialog[data-variant="responsive-sheet"] .ui-dialog__footer {
+    padding-block-end: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Authentication */
 .auth-shell {
   min-height: 100dvh;
